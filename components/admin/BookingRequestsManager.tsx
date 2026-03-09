@@ -480,6 +480,12 @@ export default function BookingRequestsManager() {
                                                 {formatRequestedDateTime(r.requested_date, r.requested_time_labels)}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
+                                                {admin.t('admin.bookingRequests.fields.phone', 'Phone')}: {r.customer_phone || '—'}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {admin.t('admin.bookingRequests.fields.email', 'Email')}: {r.customer_email || '—'}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
                                                 {admin.t('admin.bookingRequests.fields.selectedTime', 'Selected time')}: {timeToLabel(r.selected_time_slot) ? formatTimeLabel(timeToLabel(r.selected_time_slot)) : '—'}
                                             </Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
