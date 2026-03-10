@@ -1,0 +1,105 @@
+LOCALHOST ERROR REPORT
+======================
+Generated: 2026-03-10T01:42:47.676Z
+Project: jygoqnlyazbayxvpzbet
+Window: last 5 minute(s) (2026-03-10T01:37:26.192Z -> 2026-03-10T01:42:26.191Z)
+Severity mode: warn
+
+1) Summary
+----------
+- Sources scanned: 7
+- Successful source queries: 7
+- Failed source queries: 0
+- Matched warning/error rows: 555
+- Frontend console warnings: 0
+- Frontend console errors: 0
+
+2) Where errors are coming from
+-------------------------------
+- No source-level query failures in this run.
+
+3) Why these errors are likely happening
+----------------------------------------
+- No dominant root-cause hints were detected in this window.
+
+4) Most impacted RPC/path buckets
+---------------------------------
+- No recurring RPC/path failure bucket was identified.
+
+5) Source-by-source evidence
+----------------------------
+Source: auth_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 14
+- Severity counts: error=0, warning=0, info=14
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=14
+- Top signatures:
+  - [12] {"<value>":"api","<value>":<n>,"<value>":"<value>","<value>":"get","msg":"<value>","<value>":"<value>","<value>":"<value>","<value>":"<value>","<value>":"<value>","<value>":<n>,"<value>":"<value>"}
+  - [1] {"<value>":{"<value>":"<value>","<value>":"<value>","<value>":"<value>","<value>":false,"<value>":"<value>","<value>":{"<value>":"<value>"}},"<value>":"api","<value>":<n>,"<value>":"<value>","<value>":"<value>","<value>"
+  - [1] {"<value>":"<value>","<value>":"<value>","<value>":"<value>","<value>":"<value>","<value>":true,"msg":"<value>","<value>":"<value>","<value>":"<value>","<value>":"<value>"}
+
+Source: edge_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 472
+- Severity counts: error=0, warning=0, info=472
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=0
+- Top signatures:
+  - [1] get | <n> | 76.<n>.<n>.12 | 9d9e9f2c6ebf9ae2 | https://jygoqnlyazbayxvpzbet.supabase.co/rest/v1/admin_users?select=id&id=eq.<uuid> | node
+  - [1] post | <n> | 76.<n>.<n>.12 | 9d9e9f2c1fb14d9a | https://jygoqnlyazbayxvpzbet.supabase.co/rest/v1/rpc/rpc_get_page_sections | mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/<n>.36 (khtml, like gecko) chrome/<n>.0.0
+  - [1] post | <n> | 76.<n>.<n>.12 | 9d9e9f2c0fab4d9a | https://jygoqnlyazbayxvpzbet.supabase.co/rest/v1/rpc/rpc_get_page_sections | mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/<n>.36 (khtml, like gecko) chrome/<n>.0.0
+  - [1] post | <n> | 76.<n>.<n>.12 | 9d9e9f2c0f9c4d9a | https://jygoqnlyazbayxvpzbet.supabase.co/rest/v1/rpc/rpc_get_page_sections | mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/<n>.36 (khtml, like gecko) chrome/<n>.0.0
+  - [1] post | <n> | 76.<n>.<n>.12 | 9d9e9f2c0f994d9a | https://jygoqnlyazbayxvpzbet.supabase.co/rest/v1/rpc/rpc_get_page_sections | mozilla/5.0 (windows nt 10.0; win64; x64) applewebkit/<n>.36 (khtml, like gecko) chrome/<n>.0.0
+
+Source: function_edge_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 0
+- Severity counts: error=0, warning=0, info=0
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=0
+
+Source: function_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 0
+- Severity counts: error=0, warning=0, info=0
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=0
+
+Source: postgres_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 69
+- Severity counts: error=0, warning=0, info=69
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=69
+- Top signatures:
+  - [28] connection authenticated: user="<value>" method=trust (/etc/postgresql/pg_hba.conf:8)
+  - [23] connection authorized: user=authenticator database=postgres application_name=postgrest ssl enabled (protocol=tlsv1.3, cipher=tls_aes_256_gcm_sha384, bits=<n>)
+  - [11] connection received: host=::1 port=<n>
+  - [5] connection authorized: user=supabase_admin database=postgres application_name=postgres_exporter
+  - [1] connection authorized: user=supabase_auth_admin database=postgres
+
+Source: realtime_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 0
+- Severity counts: error=0, warning=0, info=0
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=0
+
+Source: storage_logs
+- Query status: ok (HTTP 200)
+- Matched entries: 0
+- Severity counts: error=0, warning=0, info=0
+- HTTP buckets in matched entries: 4xx=0, 5xx=0, unknown=0
+
+6) Frontend Console Diagnostics
+-------------------------------
+- Auto capture attempted: yes
+- Visited routes (4):
+  - http://localhost:3000/
+  - http://localhost:3000/admin
+  - http://localhost:3000/admin/live-editor
+  - http://localhost:3000/adminlogin
+- Console file: C:\Users\tyler\OneDrive\Desktop\Jazzy Surf School\project\networkErrors\localhost.console.json
+- Raw console events captured: 4
+- Relevant console events: 0
+- Warnings: 0
+- Errors: 0
+
+7) Action checklist
+-------------------
+- No immediate high-risk patterns detected in this window; inspect topSignatures and likelyPrimaryCauses for recurring weak signals.

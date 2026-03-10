@@ -1,0 +1,58 @@
+[
+  {
+    "ts": "2026-03-10T01:42:28.125Z",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+    "args": [
+      "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools",
+      "font-weight:bold"
+    ],
+    "location": {
+      "url": "webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js",
+      "lineNumber": 36887,
+      "columnNumber": 16
+    }
+  },
+  {
+    "ts": "2026-03-10T01:42:31.009Z",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+    "args": [
+      "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools",
+      "font-weight:bold"
+    ],
+    "location": {
+      "url": "webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js",
+      "lineNumber": 36887,
+      "columnNumber": 16
+    }
+  },
+  {
+    "ts": "2026-03-10T01:42:33.994Z",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+    "args": [
+      "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools",
+      "font-weight:bold"
+    ],
+    "location": {
+      "url": "webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js",
+      "lineNumber": 36887,
+      "columnNumber": 16
+    }
+  },
+  {
+    "ts": "2026-03-10T01:42:36.934Z",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+    "args": [
+      "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools",
+      "font-weight:bold"
+    ],
+    "location": {
+      "url": "webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js",
+      "lineNumber": 36887,
+      "columnNumber": 16
+    }
+  }
+]

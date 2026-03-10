@@ -482,6 +482,12 @@ export default function BookingRequestsManager() {
                                             <Typography variant="body2" color="text.secondary">
                                                 {admin.t('admin.bookingRequests.fields.selectedTime', 'Selected time')}: {timeToLabel(r.selected_time_slot) ? formatTimeLabel(timeToLabel(r.selected_time_slot)) : '—'}
                                             </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {admin.t('admin.bookingRequests.fields.phone', 'Phone')}: {r.customer_phone || '—'}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {admin.t('admin.bookingRequests.fields.email', 'Email')}: {r.customer_email || '—'}
+                                            </Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                                 {admin.t('admin.bookingRequests.billing.total', 'Total')}: {formatUsdFromCents(r.bill_total_cents)}
                                                 {'  •  '}

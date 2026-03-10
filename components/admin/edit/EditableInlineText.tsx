@@ -22,12 +22,14 @@ export default function EditableInlineText({
     children,
     multiline = false,
     fullWidth = false,
+    showEditControl = true,
 }: {
     cmsKey: string;
     fallback: string;
     children: (value: string) => React.ReactNode;
     multiline?: boolean;
     fullWidth?: boolean;
+    showEditControl?: boolean;
 }) {
     const { enabled } = useAdminEdit();
     const locale = useLocale();
@@ -82,7 +84,10 @@ export default function EditableInlineText({
     }
 
     return (
-        <Box sx={{ position: 'relative', display: 'inline-block', width: fullWidth ? '100%' : 'auto' }}>
+        <Box
+            component={editing ? 'div' : 'span'}
+            sx={{ position: 'relative', display: editing ? 'block' : 'inline-block', width: fullWidth ? '100%' : 'auto' }}
+        >
             {editing ? (
                 <Box sx={{ display: 'grid', gap: 1 }}>
                     {error ? <Alert severity="error">{error}</Alert> : null}
@@ -115,15 +120,17 @@ export default function EditableInlineText({
             ) : (
                 <>
                     {children(value)}
-                    <Tooltip title={admin.t('admin.common.edit', 'Edit')}>
-                        <IconButton
-                            size="small"
-                            onClick={startEdit}
-                            sx={{ position: 'absolute', top: -10, right: -10, backgroundColor: 'background.paper' }}
-                        >
-                            <EditOutlined fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
+                    {showEditControl ? (
+                        <Tooltip title={admin.t('admin.common.edit', 'Edit')}>
+                            <IconButton
+                                size="small"
+                                onClick={startEdit}
+                                sx={{ position: 'absolute', top: -10, right: -10, backgroundColor: 'background.paper' }}
+                            >
+                                <EditOutlined fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    ) : null}
                 </>
             )}
         </Box>

@@ -4,16 +4,38 @@
   "private": true,
   "scripts": {
     "clean:next": "node scripts/clean-next.cjs",
-    "openall": "node scripts/open-all-files.js",
+    "open-all": "node scripts/open-all-files.js",
+    "openall": "npm run open-all",
     "predev": "npm run clean:next",
     "dev": "next dev",
     "prebuild": "npm run clean:next",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "eslint": "next lint",
+    "eslint:fix": "next lint --fix",
+    "typecheck": "tsc --noEmit",
     "typegen": "node scripts/typegen.cjs",
+    "backend-snapshot": "node scripts/backend-snapshot.js",
     "snapshot": "node scripts/backend-snapshot.js",
-    "fulldb": "npm run typegen && npm run snapshot"
+    "gen:rpc": "node scripts/gen-rpc-definitions.mjs",
+    "gen:edge-functions": "node scripts/gen-edge-functions.mjs",
+    "gen:policies": "node scripts/gen-policies.mjs",
+    "rpcmap": "node scripts/gen-rpc-map.mjs",
+    "funcgen": "node scripts/gen-functions-sql.cjs",
+    "fulldb": "npm run typegen && npm run backend-snapshot && npm run gen:rpc && npm run gen:edge-functions && npm run gen:policies && npm run rpcmap && npm run funcgen",
+    "audit:supabase": "node scripts/supabase_audit.mjs --in audits/supabase --out audits/supabase/supabase_audit.md --top 20 --format both",
+    "audit:supabase:security": "node scripts/supabase_audit.mjs --in audits/supabase --out audits/supabase/supabase_audit.md --only security --top 20 --format both",
+    "audit:supabase:perf": "node scripts/supabase_audit.mjs --in audits/supabase --out audits/supabase/supabase_audit.md --only performance --top 20 --format both",
+    "audit:supabase:queries": "node scripts/supabase_audit.mjs --in audits/supabase --out audits/supabase/supabase_audit.md --only queries --top 20 --format both",
+    "audit:supabase:collect": "node scripts/supabase_collect.mjs",
+    "log5": "node scripts/supabase_logs.mjs",
+    "log5:invite": "node scripts/supabase_logs.mjs --invite",
+    "log5:error": "node scripts/supabase_logs.mjs --severity=error",
+    "log5:full": "node scripts/supabase_logs.mjs --severity=all",
+    "log5:postgres": "node scripts/supabase_logs.mjs postgres_logs",
+    "log5:setup": "node scripts/setup_supabase_logs.mjs",
+    "supabaselogs": "node scripts/supabase_logs.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -37,12 +59,16 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "recharts": "^2.12.7",
-    "typescript": "5.2.2",
-    "zod": "^3.23.8"
+    "typescript": "5.2.2"
   },
   "devDependencies": {
     "baseline-browser-mapping": "^2.9.7",
+    "commander": "^14.0.3",
     "dotenv": "^17.2.2",
-    "tsx": "^4.20.5"
+    "find-up": "^8.0.0",
+    "picocolors": "^1.1.1",
+    "playwright": "^1.58.2",
+    "tsx": "^4.20.5",
+    "zod": "^4.3.6"
   }
 }

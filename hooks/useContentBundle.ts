@@ -113,7 +113,9 @@ export default function useContentBundle(prefix: string, mediaPrefix?: string): 
             const v = strings[key];
             if (typeof v === 'string' && v.trim().length > 0) return v;
 
-            if (isDev()) {
+            const hasFallback = typeof fallback === 'string' && fallback.trim().length > 0;
+
+            if (isDev() && !hasFallback) {
                 const id = `${locale}::${prefix}::${key}`;
                 if (!missingLogged.has(id)) {
                     missingLogged.add(id);

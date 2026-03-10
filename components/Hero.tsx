@@ -122,7 +122,7 @@ const Hero: React.FC<HeroProps> = ({
                 })}
               >
                 {cmsKeyBase ? (
-                  <EditableInlineText cmsKey={`${cmsKeyBase}.primaryAction`} fallback={primaryAction}>
+                  <EditableInlineText cmsKey={`${cmsKeyBase}.primaryAction`} fallback={primaryAction} showEditControl={false}>
                     {(v) => <>{v}</>}
                   </EditableInlineText>
                 ) : (
@@ -148,7 +148,7 @@ const Hero: React.FC<HeroProps> = ({
                   })}
                 >
                   {cmsKeyBase ? (
-                    <EditableInlineText cmsKey={`${cmsKeyBase}.secondaryAction`} fallback={secondaryAction}>
+                    <EditableInlineText cmsKey={`${cmsKeyBase}.secondaryAction`} fallback={secondaryAction} showEditControl={false}>
                       {(v) => <>{v}</>}
                     </EditableInlineText>
                   ) : (
