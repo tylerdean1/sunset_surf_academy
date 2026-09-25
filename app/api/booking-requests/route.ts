@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendBookingEmails } from '@/lib/server/bookingEmail';
 
 function normalizeTime(value: unknown): string | null {
     const raw = String(value ?? '').trim();
@@ -53,10 +54,13 @@ export async function POST(req: Request) {
         if (!customer_name || !customer_email || !customer_phone) {
             return NextResponse.json({ error: 'Missing customer fields' }, { status: 400 });
         }
+        if (customer_name.length > 160 || customer_phone.length > 40 || customer_email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer_email)) {
+            return NextResponse.json({ error: 'Invalid customer fields' }, { status: 400 });
+        }
         if (!requested_date || !requested_lesson_type) {
             return NextResponse.json({ error: 'Missing requested fields' }, { status: 400 });
         }
-        if (!Number.isFinite(party_size) || party_size < 1) {
+        if (!Number.isInteger(party_size) || party_size < 1 || party_size > 30) {
             return NextResponse.json({ error: 'Invalid party_size' }, { status: 400 });
         }
         if (!requested_time_labels.length) {
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
         // Validate lesson type against DB (source of truth for pricing)
         const { data: lt, error: ltErr } = await supabase
             .from('lesson_types')
-            .select('key')
+            .select('key, display_name')
             .eq('key', requested_lesson_type)
             .eq('is_active', true)
             .maybeSingle();
@@ -106,7 +110,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ ok: true, booking_request: data });
+        const notifications = await sendBookingEmails({
+            id: String(data.id),
+            customerName: customer_name,
+            customerEmail: customer_email,
+            customerPhone: customer_phone,
+            lessonName: lt.display_name || requested_lesson_type,
+            date: requested_date,
+            timeLabels: requested_time_labels,
+            partySize: party_size,
+            partyNames: party_names,
+            notes,
+            locale: (body as any).locale === 'es' ? 'es' : 'en',
+        });
+
+        console.info('[booking-email] Delivery result', {
+            bookingId: data.id,
+            admin: notifications.admin.status,
+            adminEmailId: notifications.admin.id,
+            customer: notifications.customer.status,
+            customerEmailId: notifications.customer.id,
+        });
+
+        return NextResponse.json({ ok: true, booking_request: data, notifications: {
+            admin: notifications.admin.status,
+            customer: notifications.customer.status,
+        } });
     } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Unknown error' }, { status: 500 });
     }

@@ -18,7 +18,7 @@ export async function GET() {
         booking_requests: true,
         availability: false,
         payments: false,
-        notifications: 'stub',
+        notifications: process.env.RESEND_API_KEY ? 'configured' : 'unconfigured',
         stripe_webhook: false
       },
       env: envStatus

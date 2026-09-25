@@ -20,8 +20,7 @@ import {
 } from '@mui/material';
 import Checkbox from '@mui/material/Checkbox';
 import ListItemText from '@mui/material/ListItemText';
-import { sendBookingNotification } from '@/lib/notifications';
-import { useCmsStringValue } from '@/hooks/useCmsStringValue';
+import { useLocale } from 'next-intl';
 import useContentBundle from '@/hooks/useContentBundle';
 
 const FALLBACK_COPY = 'Content unavailable';
@@ -38,7 +37,7 @@ export type BookingData = {
 };
 
 interface BookingCalendarProps {
-  onBookingComplete: (booking: BookingData) => void;
+  onBookingComplete: (booking: BookingData, emailDelivered: boolean) => void;
   initialLessonTypeId?: string;
 }
 
@@ -56,6 +55,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>('');
+  const locale = useLocale();
 
   const ui = useContentBundle('ui.');
 
@@ -93,9 +93,6 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
   const backLabel = ui.t('ui.booking.actions.back', FALLBACK_COPY);
   const nextLabel = ui.t('ui.booking.actions.next', FALLBACK_COPY);
   const submitLabel = ui.t('ui.booking.actions.submit', FALLBACK_COPY);
-
-  const adminPhone = useCmsStringValue('page.contact.phone', FALLBACK_COPY).value;
-  const adminEmail = useCmsStringValue('page.contact.email', FALLBACK_COPY).value;
 
   type LessonType = {
     key: string;
@@ -199,6 +196,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
           requested_date: bookingData.date,
           requested_time_labels: bookingData.timeSlots,
           requested_lesson_type: bookingData.lessonType,
+          locale,
         }),
       });
 
@@ -207,28 +205,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
         throw new Error(String((json as any)?.error || 'Failed to submit request'));
       }
 
-      // Best-effort notification (does not block success)
-      const payload = {
-        date: bookingData.date,
-        timeSlots: bookingData.timeSlots,
-        lessonType: bookingData.lessonType,
-        partySize: bookingData.partySize,
-        customerName: bookingData.customerName,
-        customerEmail: bookingData.customerEmail,
-        customerPhone: bookingData.customerPhone,
-        partyNames: bookingData.partyNames,
-        adminPhone,
-        adminEmail
-      };
-
-      try {
-        await sendBookingNotification(payload);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('sendBookingNotification error', err);
-      }
-
-      onBookingComplete(bookingData);
+      const notifications = (json as any)?.notifications;
+      onBookingComplete(bookingData, notifications?.admin === 'sent' && notifications?.customer === 'sent');
     } catch (err: any) {
       setSubmitError(err?.message || 'Failed to submit request');
     } finally {

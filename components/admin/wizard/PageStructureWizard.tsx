@@ -109,12 +109,9 @@ function withDefaultPointers(
             if (!next.subtitleKey) next.subtitleKey = defaultContent.subtitleKey;
             if (!next.bodyKey) next.bodyKey = defaultContent.bodyKey;
 
-            const ctaPrimary = mergeJsonObjects(ensureNestedObject(next, 'ctaPrimary'), defaultContent.ctaPrimary as any);
-            const ctaSecondary = mergeJsonObjects(ensureNestedObject(next, 'ctaSecondary'), defaultContent.ctaSecondary as any);
-
-            // Preserve any existing nested keys; fill missing defaults.
-            next.ctaPrimary = mergeJsonObjects(defaultContent.ctaPrimary as any, ctaPrimary as any) as any;
-            next.ctaSecondary = mergeJsonObjects(defaultContent.ctaSecondary as any, ctaSecondary as any) as any;
+            // Existing nested pointers take precedence over defaults.
+            next.ctaPrimary = mergeJsonObjects(defaultContent.ctaPrimary as any, ensureNestedObject(next, 'ctaPrimary')) as any;
+            next.ctaSecondary = mergeJsonObjects(defaultContent.ctaSecondary as any, ensureNestedObject(next, 'ctaSecondary')) as any;
         }
 
         return next;
@@ -244,9 +241,10 @@ export default function PageStructureWizard(props: { pageKey: string; autoOpen?:
         });
     }, []);
 
+    const translate = admin.t;
     const load = React.useCallback(async () => {
         if (!pageKey) {
-            setError(admin.t('admin.common.loadFailed', 'Failed to load'));
+            setError(translate('admin.common.loadFailed', 'Failed to load'));
             return;
         }
         setLoading(true);
@@ -256,7 +254,7 @@ export default function PageStructureWizard(props: { pageKey: string; autoOpen?:
             const rows = await rpcGetPageSections(pageKey);
             mergeFetchedSections(rows);
         } catch (e: any) {
-            const msg = e?.message || admin.t('admin.common.loadFailed', 'Failed to load');
+            const msg = e?.message || translate('admin.common.loadFailed', 'Failed to load');
             if (isAuthErrorMessage(msg)) setAuthError(msg);
             else setError(msg);
             setBaseSections([]);
@@ -264,11 +262,10 @@ export default function PageStructureWizard(props: { pageKey: string; autoOpen?:
         } finally {
             setLoading(false);
         }
-    }, [admin, mergeFetchedSections, pageKey]);
+    }, [translate, mergeFetchedSections, pageKey]);
 
-    const openWizard = async () => {
+    const openWizard = () => {
         setOpen(true);
-        await load();
     };
 
     const prevPageKeyRef = React.useRef<string>('');
@@ -300,7 +297,8 @@ export default function PageStructureWizard(props: { pageKey: string; autoOpen?:
     const stagedSections = React.useMemo(() => {
         const baseById = new Map(baseSections.map((s) => [s.id, s] as const));
         const out: PageSectionRow[] = [];
-        for (const id of orderIds) {
+        for (let index = 0; index < orderIds.length; index++) {
+            const id = orderIds[index];
             const base = baseById.get(id);
             if (!base) continue;
             const edits = editsById[id] || {};
@@ -310,7 +308,7 @@ export default function PageStructureWizard(props: { pageKey: string; autoOpen?:
 
             // The generated RPC types currently model `anchor` as a string.
             // Represent "no anchor" as an empty string in staged rows.
-            out.push({ ...base, meta: nextMeta, anchor: String(nextAnchor ?? '') });
+            out.push({ ...base, sort: nextSortForIndex(index), meta: nextMeta, anchor: String(nextAnchor ?? '') });
         }
         return out;
     }, [baseSections, editsById, orderIds]);

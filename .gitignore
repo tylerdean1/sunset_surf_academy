@@ -38,3 +38,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*
+/supabase/.temp/project-ref
+/supabase/.temp/linked-project.json

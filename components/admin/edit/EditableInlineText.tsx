@@ -34,7 +34,7 @@ export default function EditableInlineText({
     const { enabled } = useAdminEdit();
     const locale = useLocale();
     const admin = useContentBundle('admin.');
-    const { value } = useCmsStringValue(cmsKey, fallback);
+    const { value, setLocalValue } = useCmsStringValue(cmsKey, fallback);
 
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState('');
@@ -59,6 +59,7 @@ export default function EditableInlineText({
         setError(null);
         try {
             await saveCmsStringValue(cmsKey, locale, draft);
+            setLocalValue(draft);
             setEditing(false);
         } catch (e: any) {
             setError(e?.message || admin.t('admin.edit.errors.saveFailed', 'Save failed'));

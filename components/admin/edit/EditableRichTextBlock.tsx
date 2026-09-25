@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -44,6 +44,7 @@ export default function EditableRichTextBlock({
 
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState('');
+    const [savedValue, setSavedValue] = useState<string | null>(null);
     const [showSpanishDraft, setShowSpanishDraft] = useState(false);
     const [spanishDraft, setSpanishDraft] = useState('');
     const [saving, setSaving] = useState(false);
@@ -52,11 +53,16 @@ export default function EditableRichTextBlock({
     const [translateError, setTranslateError] = useState<string | null>(null);
 
     const canPublish = useMemo(() => enabled && locale === 'es', [enabled, locale]);
+    const displayValue = savedValue ?? value;
+
+    useEffect(() => {
+        setSavedValue(null);
+    }, [cmsKey, value]);
 
     const startEdit = () => {
         setError(null);
         setTranslateError(null);
-        setDraft(value || '');
+        setDraft(displayValue || '');
         setShowSpanishDraft(false);
         setSpanishDraft('');
         setEditing(true);
@@ -79,6 +85,7 @@ export default function EditableRichTextBlock({
                 await saveRich(cmsKey, 'es', spanishDraft);
             }
 
+            setSavedValue(draft);
             setEditing(false);
         } catch (e: any) {
             setError(e?.message || admin.t('admin.edit.errors.saveFailed', 'Save failed'));
@@ -199,7 +206,7 @@ export default function EditableRichTextBlock({
 
     return (
         <Box sx={{ position: 'relative' }}>
-            {value ? <RichTextRenderer json={value} /> : null}
+            {displayValue ? <RichTextRenderer json={displayValue} /> : null}
             <Tooltip title={admin.t('admin.common.edit', 'Edit')}>
                 <IconButton
                     size="small"

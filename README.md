@@ -27,7 +27,7 @@ Content (pages + media) is managed via Supabase (Postgres + Storage). Booking is
 ### What is still stubbed / not wired
 - Availability: `GET /api/availability` returns `{ slots: [] }`
 - “Bookings create” pipeline: `POST /api/bookings/create` returns `501`
-- Notifications: `POST /api/notify` logs a summary (no SMS/email provider)
+- SMS alerts are not configured; the booking email flow uses Resend
 - Stripe: webhook route is not implemented (folder exists, no handler)
 
 ## Local setup
@@ -49,6 +49,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
 # Server-side admin routes (DO NOT expose this to the browser)
 SUPABASE_SERVICE_ROLE_KEY=
+
+# Booking request emails (server-side only; sender domain must be verified in Resend)
+RESEND_API_KEY=
 
 # Optional: used by `npm run typegen` / `npm run snapshot`
 SUPABASE_PROJECT_REF=
@@ -82,11 +85,12 @@ npm run dev
 ## Booking flow (request-based)
 
 1) Public user submits a request (no checkout): `POST /api/booking-requests`
-2) Admin reviews the request in `/{locale}/admin` → “Requests & Billing”
-3) Approving a request creates a `sessions` row (via Supabase RPC) and links it back to the request
+2) After the request is saved, the server sends an admin alert to `sunsetsurfacademy@gmail.com` and a request receipt to the customer. Both use `bookings@sunsetsurfacademy.com` as sender and set Reply-To to the monitored Gmail inbox. If Resend is unavailable, the request remains saved and the booking page shows an email warning.
+3) Admin reviews the request in `/{locale}/admin` → “Requests & Billing”
+4) Approving a request creates a `sessions` row (via Supabase RPC) and links it back to the request
 
 Notes:
-- The booking UI and `GET /api/lesson-types` are currently **static placeholder data** (prices/types are not DB-driven).
+- The booking UI loads active lesson types from `GET /api/lesson-types`.
 - Availability is currently not enforced (availability API is stubbed).
 
 ## CMS + admin

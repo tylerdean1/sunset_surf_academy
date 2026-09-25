@@ -1057,7 +1057,7 @@ BEGIN
   RETURN QUERY
     SELECT
       ms.slot_key,
-      ms.sort,
+      ms.sort::integer,
       ms.asset_id,
       a.title,
       a.bucket,

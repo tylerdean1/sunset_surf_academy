@@ -200,7 +200,7 @@ export function PagePreviewRendererInner(props: {
                                 secondaryAction={secondaryLabelKey ? t(secondaryLabelKey, 'Secondary') : 'Secondary'}
                                 primaryHref={primaryHrefKey ? getHref(primaryHrefKey, '#') : '#'}
                                 secondaryHref={secondaryHrefKey ? getHref(secondaryHrefKey, '#') : '#'}
-                                cmsKeyBase={`section.${s.id}`}
+                                cmsKeyBase={props.content ? undefined : `section.${s.id}`}
                             />
                             <Container maxWidth="lg" sx={{ py: 2 }}>
                                 <Typography variant="body2" color="text.secondary">

@@ -185,6 +185,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
         setPickerTarget(null);
     };
 
+    const translate = admin.t;
     const loadSections = React.useCallback(async () => {
         if (!pageKey) return;
         setLoading(true);
@@ -197,7 +198,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
             // default selection
             setSelectedSectionId((prev) => prev || (ordered[0]?.id ? String(ordered[0].id) : ''));
         } catch (e: any) {
-            const msg = e?.message || admin.t('admin.common.loadFailed', 'Failed to load');
+            const msg = e?.message || translate('admin.common.loadFailed', 'Failed to load');
             if (isAuthErrorMessage(msg)) setAuthError(msg);
             else setError(msg);
             setSections([]);
@@ -205,7 +206,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
         } finally {
             setLoading(false);
         }
-    }, [admin, pageKey]);
+    }, [translate, pageKey]);
 
     const openWizard = async () => {
         setOpen(true);

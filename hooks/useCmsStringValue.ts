@@ -76,6 +76,7 @@ export function useCmsStringValue(pageKey: string, fallback: string) {
         value,
         loading: enabled ? adminValue === null && false : publicCms.loading,
         error: enabled ? null : publicCms.error,
+        setLocalValue: setAdminValue,
     };
 }
 

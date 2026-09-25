@@ -31,9 +31,7 @@ function usePrefersReducedMotion() {
         }
 
         // Safari < 14
-        // eslint-disable-next-line deprecation/deprecation
         mql.addListener(apply);
-        // eslint-disable-next-line deprecation/deprecation
         return () => mql.removeListener(apply);
     }, []);
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { Container, Typography, Box, Alert } from '@mui/material';
 import BookingCalendar, { type BookingData } from '../../../components/BookingCalendar';
 import ContentBundleProvider from '@/components/content/ContentBundleContext';
@@ -18,6 +19,8 @@ export default function BookPage() {
 function BookInner() {
   const searchParams = useSearchParams();
   const [bookingComplete, setBookingComplete] = useState(false);
+  const [emailDelivered, setEmailDelivered] = useState(false);
+  const locale = useLocale();
   const initialLessonTypeId = searchParams.get('lesson') || undefined;
   const ctx = useContentBundleContext();
   const strings = ctx?.strings ?? {};
@@ -30,9 +33,9 @@ function BookInner() {
   const title = tDb('page.book.title', fallbackCopy);
   const requestReceived = tDb('page.book.requestReceived', fallbackCopy);
 
-  const handleBookingComplete = (booking: BookingData) => {
-    console.log('Booking completed:', booking);
+  const handleBookingComplete = (_booking: BookingData, delivered: boolean) => {
     // Admin follows up manually (no in-app payment processing)
+    setEmailDelivered(delivered);
     setBookingComplete(true);
   };
 
@@ -45,9 +48,16 @@ function BookInner() {
       </Box>
 
       {bookingComplete ? (
-        <Alert severity="success" sx={{ mb: 4 }}>
-          {requestReceived}
-        </Alert>
+        <>
+          <Alert severity="success" sx={{ mb: 2 }}>{requestReceived}</Alert>
+          {!emailDelivered ? (
+            <Alert severity="warning" sx={{ mb: 4 }}>
+              {locale === 'es'
+                ? 'Tu solicitud se guardó, pero no pudimos confirmar el envío de los correos. Si no recibes noticias, escríbenos a sunsetsurfacademy@gmail.com.'
+                : 'Your request was saved, but we could not confirm email delivery. If you do not hear from us, email sunsetsurfacademy@gmail.com.'}
+            </Alert>
+          ) : null}
+        </>
       ) : (
         <BookingCalendar onBookingComplete={handleBookingComplete} initialLessonTypeId={initialLessonTypeId} />
       )}

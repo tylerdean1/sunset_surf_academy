@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { AdminEditProvider } from '@/components/admin/edit/AdminEditContext';
 import useContentBundle from '@/hooks/useContentBundle';
@@ -24,9 +26,25 @@ import AboutJazPage from '@/app/[locale]/about_jaz/page';
 import BookPage from '@/app/[locale]/book/page';
 import GalleryMediaSlotsEditor from '@/components/admin/GalleryMediaSlotsEditor';
 
+function pageComponent(page: AdminPageKey) {
+    switch (page) {
+        case 'home': return HomePage;
+        case 'lessons': return LessonsPage;
+        case 'book': return BookPage;
+        case 'gallery': return GalleryPage;
+        case 'mission_statement': return MissionStatementPage;
+        case 'about_jaz': return AboutJazPage;
+        case 'team': return TeamPage;
+        case 'faq': return FaqPage;
+        case 'contact': return ContactPage;
+        default: return null;
+    }
+}
+
 export default function AdminLiveEditor() {
     const admin = useContentBundle('admin.');
     const searchParams = useSearchParams();
+    const locale = useLocale();
     const pageParam = searchParams.get('page');
     const modeParam = searchParams.get('mode');
     const mode: 'structure' | 'content' = modeParam === 'content' ? 'content' : 'structure';
@@ -45,30 +63,7 @@ export default function AdminLiveEditor() {
         return <Alert severity="error">{msg}</Alert>;
     }
 
-    const Component = useMemo(() => {
-        switch (page) {
-            case 'home':
-                return HomePage;
-            case 'lessons':
-                return LessonsPage;
-            case 'book':
-                return BookPage;
-            case 'gallery':
-                return GalleryPage;
-            case 'mission_statement':
-                return MissionStatementPage;
-            case 'about_jaz':
-                return AboutJazPage;
-            case 'team':
-                return TeamPage;
-            case 'faq':
-                return FaqPage;
-            case 'contact':
-                return ContactPage;
-            default:
-                return null;
-        }
-    }, [page]);
+    const Component = pageComponent(page);
 
     if (!Component) {
         const msg = admin.t('admin.liveEditor.unknownPage', 'Unknown page: {page}').replace('{page}', String(page));
@@ -93,14 +88,18 @@ export default function AdminLiveEditor() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Typography variant="body2" color="text.secondary">
                         {admin.t('admin.liveEditor.pageLabel', 'Page')}: <Box component="span" sx={{ fontFamily: 'monospace' }}>{page}</Box>
-                        {' · '}
-                        mode: <Box component="span" sx={{ fontFamily: 'monospace' }}>{mode}</Box>
                     </Typography>
+                    <Button size="small" variant={mode === 'structure' ? 'contained' : 'outlined'} href={`/${locale}/admin/live-editor?page=${page}&mode=structure`}>
+                        Structure
+                    </Button>
+                    <Button size="small" variant={mode === 'content' ? 'contained' : 'outlined'} href={`/${locale}/admin/live-editor?page=${page}&mode=content`}>
+                        Content
+                    </Button>
                 </Box>
 
                 <Box sx={{ mt: 2 }}>
-                    {mode === 'structure' ? <PageStructureWizard pageKey={page} autoOpen /> : null}
-                    {mode === 'content' ? <PageContentWizard pageKey={page} autoOpen /> : null}
+                    {mode === 'structure' ? <PageStructureWizard key={`structure:${page}`} pageKey={page} autoOpen /> : null}
+                    {mode === 'content' ? <PageContentWizard key={`content:${page}`} pageKey={page} autoOpen /> : null}
                 </Box>
 
                 {page === 'gallery' ? <GalleryMediaSlotsEditor /> : null}

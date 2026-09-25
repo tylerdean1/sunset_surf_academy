@@ -46,6 +46,11 @@ export function RichTextEditor({
 }) {
     const admin = useContentBundle('admin.');
     const [color, setColor] = useState<string>('#000000');
+    const onChangeRef = React.useRef(onChange);
+
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
 
     const doc = useMemo(() => safeParseJsonDoc(value), [value]);
 
@@ -58,14 +63,18 @@ export function RichTextEditor({
             },
         },
         onUpdate: ({ editor }) => {
-            onChange(serializeJsonDoc(editor.getJSON() as any));
+            onChangeRef.current(serializeJsonDoc(editor.getJSON() as any));
         },
     });
 
     // Keep editor in sync when switching pages/fields.
     useEffect(() => {
         if (!editor) return;
-        editor.commands.setContent(doc as any, { emitUpdate: false });
+        // Typing updates `value` through onChange. Replacing identical content on
+        // every keystroke resets the selection and makes the editor jump.
+        if (serializeJsonDoc(editor.getJSON() as any) !== serializeJsonDoc(doc)) {
+            editor.commands.setContent(doc as any, { emitUpdate: false });
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editor, value]);
 
