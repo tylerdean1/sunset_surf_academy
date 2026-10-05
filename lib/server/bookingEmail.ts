@@ -1,4 +1,4 @@
-type BookingEmailData = {
+export type BookingEmailData = {
   id: string;
   customerName: string;
   customerEmail: string;
@@ -132,6 +132,10 @@ export async function sendBookingEmails(booking: BookingEmailData): Promise<{ ad
     send(renderCustomerEmail(booking), `booking/${booking.id}/customer`),
   ]);
   return { admin, customer };
+}
+
+export async function sendBookingEmail(kind: 'admin' | 'customer', booking: BookingEmailData): Promise<DeliveryResult> {
+  return send(kind === 'admin' ? renderAdminEmail(booking) : renderCustomerEmail(booking), `booking/${booking.id}/${kind}`);
 }
 
 export const bookingEmailTemplates = { renderAdminEmail, renderCustomerEmail };

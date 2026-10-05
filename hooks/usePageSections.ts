@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabaseClient';
 import type { Database } from '@/lib/database.types';
+import { usePublicPageSectionsSeed } from '@/components/content/PublicContentSeedContext';
+import { contentCacheGeneration, subscribeContentChanges } from '@/lib/contentCache';
+import { createSeededContentCache } from '@/lib/seededContentCache';
 
 type PageSectionRow = Database['public']['Functions']['rpc_get_page_sections']['Returns'][number];
 
@@ -14,113 +17,92 @@ type Result = {
     refresh: () => Promise<void>;
 };
 
-const cache = new Map<string, PageSectionRow[]>();
-const inflight = new Map<string, Promise<PageSectionRow[]>>();
+const cache = createSeededContentCache<PageSectionRow[]>(() => contentCacheGeneration());
 
 async function fetchSections(pageKey: string): Promise<PageSectionRow[]> {
     const key = String(pageKey || '').trim();
     if (!key) return [];
-
-    const cached = cache.get(key);
-    if (cached) return cached;
-
-    const existing = inflight.get(key);
-    if (existing) return existing;
-
-    const p = (async () => {
+    return cache.read(key, async () => {
         const supabase = getSupabaseClient();
-        if (!supabase) {
-            const empty: PageSectionRow[] = [];
-            cache.set(key, empty);
-            return empty;
-        }
+        if (!supabase) return [];
 
         const { data, error } = await supabase.rpc('rpc_get_page_sections', {
             p_page_key: key,
             p_include_drafts: false,
         });
-
-        if (error) {
-            const empty: PageSectionRow[] = [];
-            cache.set(key, empty);
-            return empty;
-        }
-
-        const rows = (data || []) as PageSectionRow[];
-        cache.set(key, rows);
-        return rows;
-    })();
-
-    inflight.set(key, p);
-    try {
-        return await p;
-    } finally {
-        inflight.delete(key);
-    }
+        if (error) throw error;
+        return (data || []) as PageSectionRow[];
+    });
 }
 
 export default function usePageSections(pageKey: string): Result {
     const key = String(pageKey || '').trim();
+    const seed = usePublicPageSectionsSeed(key);
+    const [revision, setRevision] = useState(0);
 
-    const [sections, setSections] = useState<PageSectionRow[]>(() => cache.get(key) || []);
-    const [loading, setLoading] = useState<boolean>(() => !cache.has(key));
-    const [error, setError] = useState<string | null>(null);
+    const [sectionState, setSectionState] = useState(() => ({ key, seed, sections: seed ?? [] }));
+    const sections = sectionState.key === key
+        ? (sectionState.seed === seed ? sectionState.sections : seed ?? sectionState.sections)
+        : seed ?? [];
+    const [loading, setLoading] = useState<boolean>(() => !seed && !cache.peek(key));
+    const [errorState, setErrorState] = useState<{ key: string; seed: PageSectionRow[] | undefined; revision: number; message: string } | null>(null);
+    const error = errorState?.key === key && errorState.seed === seed && errorState.revision === revision
+        ? errorState.message : null;
+    useEffect(() => subscribeContentChanges(() => {
+        setRevision((prev) => prev + 1);
+    }), []);
 
     const refresh = useMemo(() => {
         return async () => {
             if (!key) {
-                setSections([]);
-                setLoading(false);
-                setError(null);
                 return;
             }
 
             setLoading(true);
-            setError(null);
+            setErrorState(null);
             try {
-                // bust cache for a hard refresh
-                cache.delete(key);
+                // Bypass the saved response for an explicit refresh.
+                cache.remove(key);
                 const rows = await fetchSections(key);
-                setSections(rows);
+                setSectionState({ key, seed, sections: rows });
+                setErrorState(null);
             } catch (e: any) {
-                setSections([]);
-                setError(e?.message || 'Failed to load');
+                setErrorState({ key, seed, revision, message: e?.message || 'Failed to load' });
             } finally {
                 setLoading(false);
             }
         };
-    }, [key]);
+    }, [key, seed, revision]);
 
     useEffect(() => {
         let cancelled = false;
         if (!key) {
-            setSections([]);
-            setLoading(false);
-            setError(null);
+                return () => { cancelled = true; };
+        }
+
+        // A new server seed must replace an old client cache after router.refresh().
+        const seeded = seed ? cache.seed(key, seed) : undefined;
+        if (seeded) {
             return;
         }
 
-        // If cached, avoid a network fetch.
-        if (cache.has(key)) {
-            setSections(cache.get(key) || []);
-            setLoading(false);
-            setError(null);
+        const cached = cache.peek(key);
+        if (cached) {
             return;
         }
 
-        setLoading(true);
-        setError(null);
-
+        // Keep the last rendered sections while mutations revalidate in the background.
+        setLoading(sectionState.key !== key || sectionState.sections.length === 0);
         (async () => {
             try {
                 const rows = await fetchSections(key);
                 if (cancelled) return;
-                setSections(rows);
+                setSectionState({ key, seed, sections: rows });
+                setErrorState(null);
                 setLoading(false);
             } catch (e: any) {
                 if (cancelled) return;
-                setSections([]);
-                setError(e?.message || 'Failed to load');
+                setErrorState({ key, seed, revision, message: e?.message || 'Failed to load' });
                 setLoading(false);
             }
         })();
@@ -128,12 +110,12 @@ export default function usePageSections(pageKey: string): Result {
         return () => {
             cancelled = true;
         };
-    }, [key]);
+    }, [key, revision, seed, sectionState]);
 
     return {
         pageKey: key,
         sections,
-        loading,
+        loading: !key || seed || cache.peek(key) ? false : loading,
         error,
         refresh,
     };

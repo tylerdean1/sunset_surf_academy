@@ -5,8 +5,8 @@ import { isAdminRequest } from '@/lib/adminAuth';
 import ContentBundleProvider from '@/components/content/ContentBundleContext';
 import { AdminNotAuthorized, AdminShell } from '@/components/admin/AdminAuthShell';
 
-export default async function AdminPage({ params }: { params: { locale: string } }) {
-  const locale = params?.locale || 'en';
+export default async function AdminPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
   const isAdmin = await isAdminRequest();
 
   if (!isAdmin) {

@@ -5,6 +5,7 @@ import { Alert, Box, Button, Container, TextField, Typography } from "@mui/mater
 import { usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 import useContentBundle from "@/hooks/useContentBundle";
+import { syncAdminSession } from '@/lib/adminSessionClient';
 
 export default function AdminLoginPage() {
     const admin = useContentBundle('admin.');
@@ -38,24 +39,15 @@ export default function AdminLoginPage() {
                 return;
             }
 
-            const accessToken = data.session.access_token;
-            const res = await fetch("/api/admin/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ access_token: accessToken }),
-            });
-
-            if (res.ok) {
+            try {
+                await syncAdminSession(data.session.access_token);
                 window.location.href = `/${locale}/admin`;
                 return;
+            } catch (reason) {
+                await supabase.auth.signOut({ scope: 'local' });
+                await syncAdminSession(null);
+                setError(reason instanceof Error ? reason.message : admin.t('admin.login.errors.invalidCredentials', 'Invalid credentials'));
             }
-
-            const body = await res.json().catch(() => ({}));
-            if (res.status === 403) {
-                // They authenticated with Supabase, but are not an admin in our DB.
-                await supabase.auth.signOut();
-            }
-            setError(body?.message || admin.t('admin.login.errors.invalidCredentials', 'Invalid credentials'));
         } catch {
             setError(admin.t('admin.login.errors.network', 'Network error'));
         } finally {

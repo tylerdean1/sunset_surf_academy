@@ -26,8 +26,11 @@ export const RPC_NAMES = [
   'admin_list_sessions',
   'admin_map_session_to_lesson_type',
   'admin_publish_es',
+  'admin_relocate_receipt',
   'admin_replace_gallery_images',
   'admin_restore_session',
+  'admin_save_content_bundle',
+  'admin_save_media_asset',
   'admin_set_media_slot',
   'admin_update_booking_request',
   'admin_update_booking_request_billing',
@@ -38,7 +41,10 @@ export const RPC_NAMES = [
   'admin_update_session_v2',
   'admin_upsert_media_asset',
   'admin_upsert_page_content',
+  'claim_booking_notifications',
+  'complete_booking_notification',
   'compute_booking_request_bill_total_cents',
+  'configure_booking_email_worker',
   'get_page_content',
   'get_page_content_by_prefix',
   'get_public_media_asset_by_key',
@@ -52,7 +58,9 @@ export const RPC_NAMES = [
   'rpc_delete_page_section',
   'rpc_get_page_sections',
   'rpc_upsert_page_sections',
+  'submit_booking_request',
   'sync_media_assets_from_storage',
+  'verify_booking_worker_secret',
 ] as const;
 
 export type RpcName = typeof RPC_NAMES[number];

@@ -225,34 +225,20 @@ function categoryToFinancesFolder(category: FinanceCategory): string {
 }
 
 async function moveStorageObject(
-    supabase: any,
+    receiptId: string,
     bucket: string,
     fromPath: string,
-    toPath: string
-): Promise<void> {
-    if (bucket === FINANCES_BUCKET) {
-        const res = await fetch('/api/admin/finances/receipts/move', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bucket, fromPath, toPath }),
-        });
-        const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.ok) throw new Error(json?.message || 'Failed to move receipt file');
-        return;
-    }
-
-    const storage = supabase.storage.from(bucket);
-    if (typeof (storage as any).move === 'function') {
-        const { error } = await (storage as any).move(fromPath, toPath);
-        if (error) throw new Error(error.message);
-        return;
-    }
-
-    const { error: copyErr } = await storage.copy(fromPath, toPath);
-    if (copyErr) throw new Error(copyErr.message);
-
-    const { error: removeErr } = await storage.remove([fromPath]);
-    if (removeErr) throw new Error(removeErr.message);
+    toPath: string,
+    category: FinanceCategory
+): Promise<string | null> {
+    const res = await fetch('/api/admin/finances/receipts/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiptId, bucket, fromPath, toPath, category }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.ok) throw new Error(json?.message || 'Failed to move receipt file');
+    return json.warning || null;
 }
 
 function validateRefundParent(isRefund: boolean, parentId: string): string | null {
@@ -462,6 +448,7 @@ export default function ExpensesManager() {
                 const existing = rows.find((r) => r.id === id);
                 const oldCategory = existing?.category;
                 const categoryChanged = Boolean(oldCategory && oldCategory !== d.category);
+                const relocationWarnings: string[] = [];
 
                 setLoading(true);
                 setError(null);
@@ -538,30 +525,13 @@ export default function ExpensesManager() {
                         const rest = isOldFolder ? path.slice(oldFolder.length + 1) : path;
                         const toPath = `${newFolder}/${rest}`;
 
-                        await moveStorageObject(supabase as any, FINANCES_BUCKET, path, toPath);
-
-                        await rpc(supabase, 'admin_update_receipt', {
-                            p_id: rec.id,
-                            p_receipt_date: rec.receipt_date,
-                            p_category: d.category,
-                            p_total_cents: rec.total_cents,
-                            p_receipt_storage_path: `${FINANCES_BUCKET}/${toPath}`,
-                            p_vendor_name: rec.vendor_name,
-                            p_description: rec.description,
-                            p_payment_method: rec.payment_method,
-                            p_subtotal_cents: rec.subtotal_cents,
-                            p_tax_cents: rec.tax_cents,
-                            p_tip_cents: rec.tip_cents,
-                            p_transaction_id: rec.transaction_id,
-                            p_is_refund: rec.is_refund,
-                            p_parent_receipt_id: rec.parent_receipt_id,
-                            p_source_type: rec.source_type,
-                            p_notes: rec.notes,
-                        });
+                        const warning = await moveStorageObject(rec.id, FINANCES_BUCKET, path, toPath, d.category);
+                        if (warning) relocationWarnings.push(warning);
                     }
                 }
 
                 await loadExpenses();
+                if (relocationWarnings.length) setError(relocationWarnings.join(' '));
             } catch (e: any) {
                 setError(e?.message || 'Save failed');
             } finally {

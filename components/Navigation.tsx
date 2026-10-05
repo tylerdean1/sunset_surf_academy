@@ -34,7 +34,7 @@ const Navigation: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminAccess, setAdminAccess] = useState<{ path: string; allowed: boolean } | null>(null);
 
   const bundle = useContentBundle('ui.', 'nav.');
   const logoUrl = bundle.mediaByKey('nav.logo')?.url || '';
@@ -44,26 +44,24 @@ const Navigation: React.FC = () => {
   const openDrawerAria = bundle.t('ui.nav.aria.openDrawer', FALLBACK_COPY);
 
   const onAdminPage = pathname === `/${locale}/admin`;
+  const isAdmin = onAdminPage && adminAccess?.path === pathname && adminAccess.allowed;
   const selectedAdminPage = searchParams.get('page') || 'home';
 
   React.useEffect(() => {
     let cancelled = false;
-    if (!onAdminPage) {
-      setIsAdmin(false);
-      return;
-    }
+    if (!onAdminPage) return () => { cancelled = true; };
 
     (async () => {
       const res = await fetch('/api/admin/status');
       const body = await res.json().catch(() => ({}));
       if (cancelled) return;
-      setIsAdmin(!!body?.isAdmin);
+      setAdminAccess({ path: pathname, allowed: !!body?.isAdmin });
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [onAdminPage]);
+  }, [onAdminPage, pathname]);
 
   const navItems = [
     { key: 'home', href: `/${locale}`, label: bundle.t('ui.nav.home', FALLBACK_COPY) },

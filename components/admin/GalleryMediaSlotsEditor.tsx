@@ -15,7 +15,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useLocale } from 'next-intl';
-import { useCmsStringValue, saveCmsStringValue } from '@/hooks/useCmsStringValue';
+import { useCmsStringValue } from '@/hooks/useCmsStringValue';
 import MediaPickerDialog, { type MediaSelection } from '@/components/admin/MediaPickerDialog';
 import useContentBundle from '@/hooks/useContentBundle';
 import { getSupabaseClient } from '@/lib/supabaseClient';
@@ -146,18 +146,17 @@ export default function GalleryMediaSlotsEditor() {
         setCountError(null);
         setError(null);
         try {
-            // 1) Persist the desired count.
-            await saveCmsStringValue('page.gallery.images.count', locale, String(count));
-
-            // 2) Canonical rewrite: delete all gallery.images.* then recreate 0..N-1 with sort 0..N-1.
-            const asset_ids = Array.from({ length: count }, (_, i) => {
-                const slotKey = `${prefix}${i}`;
-                const sel = draftBySlot[slotKey];
-                return sel?.id ?? null;
+            await rpc<void>(getSupabaseClient(), 'admin_save_content_bundle', {
+                p_strings: [{ key: 'page.gallery.images.count', locale: locale === 'es' ? 'es' : 'en', body: String(count) }],
+                p_media: [{
+                    prefix,
+                    slots: Array.from({ length: count }, (_, index) => ({
+                        slot_key: `${prefix}${index}`,
+                        asset_id: draftBySlot[`${prefix}${index}`]?.id ?? null,
+                        sort: index,
+                    })),
+                }],
             });
-
-            const supabase = getSupabaseClient();
-            await rpc<number>(supabase, 'admin_replace_gallery_images', { p_count: count, p_asset_ids: asset_ids });
 
             await load();
         } catch (e: any) {

@@ -1,5 +1,7 @@
 'use client';
 
+import BookingEmailStatus from '@/components/admin/BookingEmailStatus';
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Alert,
@@ -488,6 +490,7 @@ export default function BookingRequestsManager() {
                                             <Typography variant="body2" color="text.secondary">
                                                 {admin.t('admin.bookingRequests.fields.email', 'Email')}: {r.customer_email || '—'}
                                             </Typography>
+                                            <BookingEmailStatus bookingId={r.id} />
                                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
                                                 {admin.t('admin.bookingRequests.billing.total', 'Total')}: {formatUsdFromCents(r.bill_total_cents)}
                                                 {'  •  '}

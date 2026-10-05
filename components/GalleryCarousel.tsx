@@ -24,8 +24,10 @@ function getRandomIndex(length: number, exclude: number) {
 export default function GalleryCarousel({ intervalMs = 8000, className = '', images: imagesProp, objectFit = 'contain', mode = 'random' }: Props) {
     const images = useMemo(() => imagesProp ?? defaultImages, [imagesProp]);
     const FADE_MS = 2000; // fade duration
-    const [index, setIndex] = useState(0);
-    const [visible, setVisible] = useState(true);
+    const imagesKey = JSON.stringify(images);
+    const [slideState, setSlideState] = useState({ imagesKey, index: 0, visible: true });
+    const slide = slideState.imagesKey === imagesKey ? slideState : { imagesKey, index: 0, visible: true };
+    const { index, visible } = slide;
     const intervalRef = useRef<number | null>(null);
     const timeoutRef = useRef<number | null>(null);
     const indexRef = useRef<number>(0);
@@ -39,12 +41,9 @@ export default function GalleryCarousel({ intervalMs = 8000, className = '', ima
         [images, mode]
     );
 
-    // reset when image set changes
-    useEffect(() => {
-        setIndex(0);
-        indexRef.current = 0;
-        setVisible(true);
-    }, [images]);
+    const updateSlide = useCallback((update: (current: typeof slide) => typeof slide) => {
+        setSlideState((previous) => update(previous.imagesKey === imagesKey ? previous : { imagesKey, index: 0, visible: true }));
+    }, [imagesKey]);
 
     useEffect(() => {
         if (!images.length) return;
@@ -57,12 +56,11 @@ export default function GalleryCarousel({ intervalMs = 8000, className = '', ima
             preload.src = images[next];
 
             // start fade out
-            setVisible(false);
+            updateSlide((currentSlide) => ({ ...currentSlide, visible: false }));
 
             // after fade duration, swap image and fade in
             timeoutRef.current = window.setTimeout(() => {
-                setIndex(next);
-                setVisible(true);
+                updateSlide((currentSlide) => ({ ...currentSlide, index: next, visible: true }));
             }, FADE_MS);
         }, intervalMs);
 
@@ -70,7 +68,7 @@ export default function GalleryCarousel({ intervalMs = 8000, className = '', ima
             if (intervalRef.current) window.clearInterval(intervalRef.current);
             if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
         };
-    }, [intervalMs, images, getNextIndex]);
+    }, [intervalMs, images, getNextIndex, updateSlide]);
 
     // preload next image whenever index changes
     useEffect(() => {

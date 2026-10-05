@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/.next15-deps-backup
 /.pnp
 .pnp.js
 
@@ -31,9 +32,10 @@ yarn-error.log*
 # vercel
 .vercel
 
-# backend snapshots (contain real data/PII; never commit)
+# Generated schema-only reference snapshots (local; baseline is tracked separately)
 /backend.snapshot.sql
 /backend.snapshot.md
+/backend.snapshot.catalog.json
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +43,4 @@ next-env.d.ts
 .env*
 /supabase/.temp/project-ref
 /supabase/.temp/linked-project.json
+/supabase/.temp/cli-latest

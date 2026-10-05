@@ -2,13 +2,13 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
-import theme from '../../theme';
 import Navigation from '../../components/Navigation';
 import type { Metadata } from 'next';
 import AppLoadingFrame from '@/components/AppLoadingFrame';
-import { getPublicCmsString } from '@/lib/publicCms';
+import PublicContentSeedProvider from '@/components/content/PublicContentSeedContext';
+import { getPublicContentBundle } from '@/lib/server/publicContent';
+import { type PublicLocale, siteOrigin } from '@/lib/publicSite';
+import type { ContentBundleResponse } from '@/types/contentBundle';
 
 const locales = ['en', 'es'];
 
@@ -16,46 +16,45 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
-  if (!locales.includes(locale as any)) notFound();
-  const fallbackCopy = 'Content unavailable';
-  const title = await getPublicCmsString('ui.meta.title', locale, fallbackCopy);
-  const description = await getPublicCmsString('ui.meta.description', locale, fallbackCopy);
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  if (!locales.includes(locale)) notFound();
   return {
-    title,
-    description,
+    metadataBase: new URL(siteOrigin()),
+    title: 'Sunset Surf Academy',
+    robots: { index: false, follow: false },
     icons: {
       icon: [{ url: '/SSA_Orange_Logo.png', type: 'image/png' }],
-    },
-    alternates: {
-      languages: {
-        en: '/en',
-        es: '/es',
-      },
     },
   };
 }
 
 export default async function LocaleLayout({
   children,
-  params: { locale }
+  params
 }: {
   children: React.ReactNode;
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
-  if (!locales.includes(locale as any)) notFound();
+  const { locale } = await params;
+  if (!locales.includes(locale)) notFound();
   setRequestLocale(locale);
-  const messages = await getMessages({ locale });
+  const [messages, nav] = await Promise.all([
+    getMessages({ locale }),
+    getPublicContentBundle(locale as PublicLocale, 'ui.', 'nav.'),
+  ]);
+  const bundles = [nav].filter((item): item is ContentBundleResponse => !!item);
+  // Other public controls share the UI strings but do not consume navigation media.
+  if (nav) bundles.push({ ...nav, mediaPrefix: 'ui.', media: [] });
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <PublicContentSeedProvider bundles={bundles} sectionsByPage={{}}>
         <AppLoadingFrame locale={locale}>
           <Navigation />
           <main className="pt-16">{children}</main>
         </AppLoadingFrame>
-      </ThemeProvider>
+      </PublicContentSeedProvider>
     </NextIntlClientProvider>
   );
 }

@@ -1,0 +1,341 @@
+{
+  "server_version": "17.6",
+  "schemas": [
+    "public"
+  ],
+  "policies": [
+    {
+      "schemaname": "public",
+      "tablename": "admin_users",
+      "policyname": "admins can manage admin_users",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "is_site_admin()",
+      "with_check": "is_site_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "booking_requests",
+      "policyname": "admins can delete booking requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "DELETE",
+      "qual": "is_site_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "booking_requests",
+      "policyname": "admins can read booking requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_site_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "booking_requests",
+      "policyname": "admins can update booking requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "is_site_admin()",
+      "with_check": "is_site_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_expenses",
+      "policyname": "admin_delete",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "is_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_expenses",
+      "policyname": "admin_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "is_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_expenses",
+      "policyname": "admin_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_expenses",
+      "policyname": "admin_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "is_admin()",
+      "with_check": "is_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "cms_page_content",
+      "policyname": "admin_all_cms_page_content",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "is_admin()",
+      "with_check": "is_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "cms_page_content",
+      "policyname": "public_read_home_section_meta",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((category = 'sections.page.home'::text) AND (page_key ~~ 'section.%.meta'::text))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "lesson_types",
+      "policyname": "lesson_types_active_read",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_active",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "media_assets",
+      "policyname": "Allow admin full access on media_assets",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((( SELECT auth.jwt() AS jwt) ->> 'role'::text) = 'admin'::text)",
+      "with_check": "((( SELECT auth.jwt() AS jwt) ->> 'role'::text) = 'admin'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "media_assets",
+      "policyname": "Allow public read on media_assets",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(public = true)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "media_slots",
+      "policyname": "Public can read slots for public assets",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((asset_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM media_assets ma\n  WHERE ((ma.id = media_slots.asset_id) AND (ma.public = true)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "page_sections",
+      "policyname": "page_sections_admin_select_all",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_site_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "page_sections",
+      "policyname": "page_sections_select_published",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(status = 'published'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "receipts",
+      "policyname": "admin_delete",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "is_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "receipts",
+      "policyname": "admin_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "is_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "receipts",
+      "policyname": "admin_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "receipts",
+      "policyname": "admin_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "is_admin()",
+      "with_check": "is_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "sessions",
+      "policyname": "admin_delete",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "is_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "sessions",
+      "policyname": "admin_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "is_admin()"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "sessions",
+      "policyname": "admin_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_admin()",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "sessions",
+      "policyname": "admin_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "is_admin()",
+      "with_check": "is_admin()"
+    }
+  ],
+  "extensions": [
+    {
+      "name": "pg_cron",
+      "schema": "pg_catalog",
+      "version": "1.6.4"
+    },
+    {
+      "name": "pg_net",
+      "schema": "extensions",
+      "version": "0.19.5"
+    },
+    {
+      "name": "pg_stat_statements",
+      "schema": "extensions",
+      "version": "1.11"
+    },
+    {
+      "name": "pgcrypto",
+      "schema": "extensions",
+      "version": "1.3"
+    },
+    {
+      "name": "supabase_vault",
+      "schema": "vault",
+      "version": "0.3.1"
+    },
+    {
+      "name": "uuid-ossp",
+      "schema": "extensions",
+      "version": "1.1"
+    },
+    {
+      "name": "wrappers",
+      "schema": "extensions",
+      "version": "0.5.4"
+    }
+  ],
+  "generated_at": "2026-10-05T22:30:41.751Z",
+  "project_ref": "jygoqnlyazbayxvpzbet",
+  "sha256": "63016c979a18ead814291f52d89bf8365f14fa12e5a744dac8784dc86577d965"
+}

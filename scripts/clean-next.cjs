@@ -6,7 +6,13 @@ const path = require('path');
 function resolveDistDir() {
     // Keep in sync with next.config.js getDistDir(): default is .next
     const distDir = process.env.NEXT_DIST_DIR || '.next';
-    return path.resolve(process.cwd(), distDir);
+    const workspace = path.resolve(process.cwd());
+    const target = path.resolve(workspace, distDir);
+    const relative = path.relative(workspace, target);
+    if (!relative || relative.startsWith(`..${path.sep}`) || relative === '..' || path.isAbsolute(relative)) {
+        throw new Error('NEXT_DIST_DIR must resolve to a build directory inside the workspace');
+    }
+    return target;
 }
 
 async function rm(targetPath) {

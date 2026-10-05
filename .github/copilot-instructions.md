@@ -3,13 +3,15 @@
 ## Shorthand / workflow meanings
 
 - **“I ran fulldb”** means: `npm run fulldb`.
-  - This is defined as: `npm run typegen && npm run snapshot`.
+  - This refreshes types, a real schema-only snapshot, RPC/edge references, policies, table RPC mappings and function SQL.
   - Treat this as having already refreshed both the generated Supabase types and the backend snapshot artifacts.
 
 - `npm run typegen` regenerates Supabase types into `lib/database.types.ts`.
 - `npm run snapshot` regenerates backend reference snapshots into:
   - `backend.snapshot.md`
-  - `backend.snapshot.sql` (when possible)
+  - `backend.snapshot.sql` (required for a successful snapshot)
+  - `backend.snapshot.catalog.json`
+  - `supabase/baseline.sql` and `supabase/baseline.metadata.json`
 
 ## Generated backend artifacts (never edit)
 
@@ -18,6 +20,11 @@ These files are generated outputs. **Do not manually edit them** under any circu
 - `lib/database.types.ts`
 - `backend.snapshot.md`
 - `backend.snapshot.sql`
+- `backend.snapshot.catalog.json`
+- `supabase/baseline.sql`
+- `supabase/baseline.metadata.json`
+- `lib/database.policies.ts`
+- `lib/functions.sql`
 
 Allowed use:
 - Read/inspect these files to understand the current backend structure, schema, RPCs, and to verify whether the backend changed.

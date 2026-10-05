@@ -20,6 +20,7 @@ import useContentBundle from '@/hooks/useContentBundle';
 import { getSupabaseClient } from '@/lib/supabaseClient';
 import type { Database, Json } from '@/lib/database.types';
 import PagePreviewRenderer from '../../sections/PagePreviewRenderer';
+import { invalidateContentCache } from '@/lib/contentCache';
 
 type CanonicalSectionKind = 'hero' | 'richText' | 'media' | 'card_group';
 
@@ -159,6 +160,7 @@ async function rpcCreatePageSection(args: {
     if (error) throw new Error(error.message);
     const id = String(data || '').trim();
     if (!id) throw new Error('Failed to create section');
+    invalidateContentCache();
     return id;
 }
 
@@ -167,6 +169,7 @@ async function rpcDeletePageSection(pageKey: string, sectionId: string) {
     if (!supabase) throw new Error('Supabase client unavailable');
     const { error } = await supabase.rpc('rpc_delete_page_section', { p_page_key: pageKey, p_section_id: sectionId });
     if (error) throw new Error(error.message);
+    invalidateContentCache();
 }
 
 async function rpcUpsertPageSections(pageKey: string, sections: Array<Record<string, any>>) {
@@ -178,6 +181,7 @@ async function rpcUpsertPageSections(pageKey: string, sections: Array<Record<str
         p_prune_missing: true,
     });
     if (error) throw new Error(error.message);
+    invalidateContentCache();
 }
 
 export default function PageStructureWizard(props: { pageKey: string; autoOpen?: boolean }) {

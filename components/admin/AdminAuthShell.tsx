@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Button, Container, Typography } from '@mui/material';
 import Link from 'next/link';
 import { useContentBundleContext } from '@/components/content/ContentBundleContext';
+import { AdminSessionBridge, AdminSignOutButton } from '@/components/admin/AdminSessionBridge';
 
 function useAdminStrings() {
     const ctx = useContentBundleContext();
@@ -20,6 +21,7 @@ export function AdminNotAuthorized({ locale }: { locale: string }) {
 
     return (
         <Container sx={{ py: 8 }}>
+            <AdminSessionBridge recover />
             <Typography variant="h4" gutterBottom>
                 {t('admin.auth.notAuthorizedTitle', 'Not authorized')}
             </Typography>
@@ -36,10 +38,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
     return (
         <>
+            <AdminSessionBridge />
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: { xs: 2, md: 4 }, pt: 2 }}>
-                <Button href={`/api/admin/logout`} variant="outlined">
+                <AdminSignOutButton>
                     {t('admin.auth.signOut', 'Sign out')}
-                </Button>
+                </AdminSignOutButton>
             </Box>
             {children}
         </>

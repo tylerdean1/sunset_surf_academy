@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Grid,
@@ -22,6 +22,7 @@ import Checkbox from '@mui/material/Checkbox';
 import ListItemText from '@mui/material/ListItemText';
 import { useLocale } from 'next-intl';
 import useContentBundle from '@/hooks/useContentBundle';
+import { BOOKING_TIME_LABELS, bookingDateBounds } from '@/lib/bookingValidation';
 
 const FALLBACK_COPY = 'Content unavailable';
 
@@ -54,6 +55,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
     partyNames: []
   });
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const submissionRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const [submitError, setSubmitError] = useState<string>('');
   const locale = useLocale();
 
@@ -128,38 +131,13 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
     };
   }, []);
 
-  // generate 30-minute slots from 07:00 to 15:30 (last slot ends at 16:00)
-  const generateTimeSlots = () => {
-    const slots: string[] = [];
-    for (let hour = 7; hour <= 15; hour++) {
-      const h12 = (hour % 12) === 0 ? 12 : hour % 12;
-      const ampm = hour < 12 ? 'AM' : 'PM';
-      slots.push(`${h12}:00 ${ampm}`);
-      slots.push(`${h12}:30 ${ampm}`);
-    }
-    return slots;
-  };
+  const timeSlots = BOOKING_TIME_LABELS;
+  const dateBounds = bookingDateBounds();
 
-  const timeSlots = generateTimeSlots();
-
-  useEffect(() => {
-    setBookingData((prev) => {
-      if (prev.lessonType) return prev;
-      const isValidInitial = typeof initialLessonTypeId === 'string' && lessonTypes.some((lt) => lt.key === initialLessonTypeId);
-      return { ...prev, lessonType: (isValidInitial ? initialLessonTypeId : (lessonTypes[0]?.key || '')) };
-    });
-  }, [initialLessonTypeId, lessonTypes]);
-
-  useEffect(() => {
-    setBookingData((prev) => {
-      const expected = Math.max(0, Number(prev.partySize || 1) - 1);
-      if (prev.partyNames.length === expected) return prev;
-      const next = [...prev.partyNames];
-      while (next.length < expected) next.push('');
-      if (next.length > expected) next.length = expected;
-      return { ...prev, partyNames: next };
-    });
-  }, [bookingData.partySize]);
+  const initialLessonIsValid = typeof initialLessonTypeId === 'string' && lessonTypes.some((lt) => lt.key === initialLessonTypeId);
+  const selectedLessonType = bookingData.lessonType || (initialLessonIsValid ? initialLessonTypeId : lessonTypes[0]?.key || '');
+  const guestCount = Math.max(0, Math.min(29, Number(bookingData.partySize || 1) - 1));
+  const partyNames = Array.from({ length: guestCount }, (_, index) => bookingData.partyNames[index] ?? '');
 
   const dollarsFromCents = (cents: number | null | undefined) => {
     if (cents == null) return 0;
@@ -169,34 +147,48 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
   };
 
   const calculateTotal = () => {
-    const lt = lessonTypes.find((x) => x.key === bookingData.lessonType);
+    const lt = lessonTypes.find((x) => x.key === selectedLessonType);
     const unit = dollarsFromCents(lt?.price_per_person_cents);
     return lt ? unit * bookingData.partySize : 0;
   };
 
   const handleNext = async () => {
+    if (submittingRef.current) return;
     if (activeStep < steps.length - 1) {
       setActiveStep(activeStep + 1);
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError('');
 
     try {
+      const payload = {
+        customer_name: bookingData.customerName,
+        customer_email: bookingData.customerEmail,
+        customer_phone: bookingData.customerPhone,
+        party_size: bookingData.partySize,
+        party_names: partyNames.filter((name) => name.trim()),
+        requested_date: bookingData.date,
+        requested_time_labels: bookingData.timeSlots,
+        requested_lesson_type: selectedLessonType,
+        locale,
+      };
+      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(payload)));
+      const fingerprint = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+      if (submissionRef.current?.fingerprint !== fingerprint) {
+        let saved: { fingerprint: string; id: string } | null = null;
+        try { saved = JSON.parse(sessionStorage.getItem('surf-booking-submission') || 'null'); } catch { /* Storage is optional. */ }
+        submissionRef.current = saved?.fingerprint === fingerprint ? saved : { fingerprint, id: crypto.randomUUID() };
+        try { sessionStorage.setItem('surf-booking-submission', JSON.stringify(submissionRef.current)); } catch { /* Retry key stays in memory. */ }
+      }
       const res = await fetch('/api/booking-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customer_name: bookingData.customerName,
-          customer_email: bookingData.customerEmail,
-          customer_phone: bookingData.customerPhone,
-          party_size: bookingData.partySize,
-          party_names: bookingData.partyNames,
-          requested_date: bookingData.date,
-          requested_time_labels: bookingData.timeSlots,
-          requested_lesson_type: bookingData.lessonType,
-          locale,
+          ...payload,
+          submission_id: submissionRef.current.id,
         }),
       });
 
@@ -206,10 +198,13 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
       }
 
       const notifications = (json as any)?.notifications;
-      onBookingComplete(bookingData, notifications?.admin === 'sent' && notifications?.customer === 'sent');
+      try { sessionStorage.removeItem('surf-booking-submission'); } catch { /* Storage is optional. */ }
+      onBookingComplete({ ...bookingData, lessonType: selectedLessonType, partyNames: partyNames.filter((name) => name.trim()) },
+        notifications?.admin === 'sent' && notifications?.customer === 'sent');
     } catch (err: any) {
       setSubmitError(err?.message || 'Failed to submit request');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -221,7 +216,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
   const canProceed = () => {
     switch (activeStep) {
       case 0:
-        return Boolean(bookingData.lessonType && bookingData.partySize > 0);
+        return Boolean(selectedLessonType && bookingData.partySize > 0);
       case 1:
         return Boolean(bookingData.date && bookingData.timeSlots && bookingData.timeSlots.length > 0);
       case 2:
@@ -254,7 +249,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
                   <FormControl fullWidth>
                     <InputLabel>{lessonTypeLabel}</InputLabel>
                     <Select
-                      value={bookingData.lessonType}
+                      value={selectedLessonType}
                       label={lessonTypeLabel}
                       onChange={(e: any) => setBookingData({
                         ...bookingData,
@@ -278,9 +273,10 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
                     value={bookingData.partySize}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBookingData({
                       ...bookingData,
-                      partySize: parseInt(e.target.value) || 1
+                      partySize: Math.max(1, Math.min(30, Number.parseInt(e.target.value, 10) || 1)),
+                      partyNames: partyNames.slice(0, Math.max(1, Math.min(30, Number.parseInt(e.target.value, 10) || 1)) - 1)
                     })}
-                    inputProps={{ min: 1, max: 8 }}
+                    inputProps={{ min: 1, max: 30 }}
                   />
                 </Grid>
               </Grid>
@@ -292,7 +288,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
                 <Typography variant="body2" color="text.secondary">
                   {String(totalBreakdownTemplate)
                     .replace('{count}', String(bookingData.partySize))
-                    .replace('{price}', String(dollarsFromCents(lessonTypes.find((lt: LessonType) => lt.key === bookingData.lessonType)?.price_per_person_cents || 0)))}
+                    .replace('{price}', String(dollarsFromCents(lessonTypes.find((lt: LessonType) => lt.key === selectedLessonType)?.price_per_person_cents || 0)))}
                 </Typography>
                 {lessonTypesError ? (
                   <Typography variant="body2" color="error" sx={{ mt: 1 }}>
@@ -320,6 +316,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
                       setBookingData({ ...bookingData, date: e.target.value, timeSlots: [] })
                     }
                     InputLabelProps={{ shrink: true }}
+                    inputProps={{ min: dateBounds.min, max: dateBounds.max }}
                   />
                 </Grid>
 
@@ -409,14 +406,14 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
                       Additional Names
                     </Typography>
                     <Grid container spacing={2}>
-                      {bookingData.partyNames.map((name, idx) => (
+                      {partyNames.map((name, idx) => (
                         <Grid key={idx} item xs={12} md={6}>
                           <TextField
                             fullWidth
                             label={`Guest ${idx + 2} Name`}
                             value={name}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                              const next = [...bookingData.partyNames];
+                              const next = [...partyNames];
                               next[idx] = e.target.value;
                               setBookingData({ ...bookingData, partyNames: next });
                             }}
@@ -439,7 +436,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
                   <strong>{summaryTimeLabel}:</strong> {bookingData.timeSlots?.length ? bookingData.timeSlots.join(', ') : ''}
                 </Typography>
                 <Typography variant="body1">
-                  <strong>{summaryLessonLabel}:</strong> {lessonTypes.find(lt => lt.key === bookingData.lessonType)?.display_name}
+                  <strong>{summaryLessonLabel}:</strong> {lessonTypes.find(lt => lt.key === selectedLessonType)?.display_name}
                 </Typography>
                 <Typography variant="body1">
                   <strong>{summaryPartySizeLabel}:</strong> {bookingData.partySize}
@@ -461,7 +458,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
             <Button
               variant="contained"
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={submitting || !canProceed()}
               sx={{
                 backgroundColor: '#20B2AA',
                 '&:hover': { backgroundColor: '#1A9A9A' }

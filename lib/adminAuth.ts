@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { sameOrigin, accessTokenMaxAge } from '@/lib/adminOrigin';
 
 const ADMIN_ACCESS_TOKEN_COOKIE = 'admin_at';
 
@@ -18,25 +19,9 @@ function isMutationMethod(method: string) {
     return method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
 }
 
-function sameOrigin(req: Request): boolean {
-    const origin = req.headers.get('origin');
-    const referer = req.headers.get('referer');
-
-    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
-    if (!host) return false;
-
-    const allowedHttp = `http://${host}`;
-    const allowedHttps = `https://${host}`;
-
-    const value = origin || referer;
-    if (!value) return false;
-
-    return value.startsWith(allowedHttp) || value.startsWith(allowedHttps);
-}
-
 export function setAdminAccessTokenCookie(res: NextResponse, accessToken: string) {
     // Access tokens expire quickly; keep cookie lifetime aligned.
-    res.cookies.set({ name: ADMIN_ACCESS_TOKEN_COOKIE, value: accessToken, maxAge: 60 * 60, ...getCookieOptions() });
+    res.cookies.set({ name: ADMIN_ACCESS_TOKEN_COOKIE, value: accessToken, maxAge: accessTokenMaxAge(accessToken), ...getCookieOptions() });
 }
 
 export function clearAdminAuthCookies(res: NextResponse) {
@@ -56,7 +41,7 @@ export async function requireAdminApi(req: Request): Promise<
         };
     }
 
-    const token = cookies().get(ADMIN_ACCESS_TOKEN_COOKIE)?.value || '';
+    const token = (await cookies()).get(ADMIN_ACCESS_TOKEN_COOKIE)?.value || '';
     if (!token) {
         return {
             ok: false,
@@ -99,7 +84,7 @@ export async function requireAdminApi(req: Request): Promise<
 }
 
 export async function isAdminRequest(): Promise<boolean> {
-    const token = cookies().get(ADMIN_ACCESS_TOKEN_COOKIE)?.value || '';
+    const token = (await cookies()).get(ADMIN_ACCESS_TOKEN_COOKIE)?.value || '';
     if (!token) return false;
 
     try {

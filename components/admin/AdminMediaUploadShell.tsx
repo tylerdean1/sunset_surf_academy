@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Button } from '@mui/material';
 import Link from 'next/link';
 import { useContentBundleContext } from '@/components/content/ContentBundleContext';
+import { AdminSessionBridge, AdminSignOutButton } from '@/components/admin/AdminSessionBridge';
 
 export function AdminMediaUploadShell({ locale, children }: { locale: string; children: React.ReactNode }) {
     const ctx = useContentBundleContext();
@@ -15,6 +16,7 @@ export function AdminMediaUploadShell({ locale, children }: { locale: string; ch
 
     return (
         <>
+            <AdminSessionBridge />
             <Box
                 sx={{
                     display: 'flex',
@@ -28,9 +30,9 @@ export function AdminMediaUploadShell({ locale, children }: { locale: string; ch
                 <Button component={Link} href={`/${locale}/admin`} variant="outlined">
                     {t('admin.nav.backToAdmin', 'Back to Admin')}
                 </Button>
-                <Button href="/api/admin/logout" variant="outlined">
+                <AdminSignOutButton>
                     {t('admin.auth.signOut', 'Sign out')}
-                </Button>
+                </AdminSignOutButton>
             </Box>
             {children}
         </>

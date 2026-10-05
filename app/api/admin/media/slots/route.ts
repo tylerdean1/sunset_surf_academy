@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAdminApi } from '@/lib/adminAuth';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import type { Database } from '@/lib/database.types';
-import { normalizeGalleryImagesSlotKey } from '@/lib/mediaSlots';
+import { mediaFailure, mediaObject, mediaSlotKey, mediaSort, mediaUuid, MediaValidationError, parseGalleryAssetIds } from '@/lib/adminMediaValidation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,8 +11,8 @@ export const dynamic = 'force-dynamic';
 function normalizePrefix(raw: string | null): string {
     const p = String(raw || '').trim();
     if (!p) return '';
-    if (p.length > 128) throw new Error('prefix too long');
-    if (!/^[a-z0-9._-]+$/i.test(p)) throw new Error('invalid prefix');
+    if (p.length > 128) throw new MediaValidationError('prefix too long');
+    if (!/^[a-z0-9._-]+$/i.test(p)) throw new MediaValidationError('invalid prefix');
     return p;
 }
 
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
             .order('sort', { ascending: true })
             .order('slot_key', { ascending: true });
 
-        if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+        if (error) return NextResponse.json({ ok: false, message: 'Failed to load media slots' }, { status: 500 });
 
         const items: SlotItem[] = (data ?? []).map((r: any) => {
             const a = r.media_assets ?? null;
@@ -74,102 +75,47 @@ export async function GET(req: Request) {
         });
 
         return NextResponse.json({ ok: true, prefix, items });
-    } catch (e: any) {
-        return NextResponse.json({ ok: false, message: e?.message || 'Failed' }, { status: 500 });
+    } catch (error: unknown) {
+        return mediaFailure(error, 'Failed to load media slots');
     }
 }
-
-type PostBody =
-    | {
-        op: 'set';
-        slot_key: string;
-        asset_id: string | null;
-        sort?: number | null;
-    }
-    | {
-        // Canonicalize gallery slots in one write:
-        // delete all gallery.images.* then insert gallery.images.0..N-1 with sort 0..N-1.
-        op: 'replace_gallery_images';
-        count: number;
-        asset_ids?: Array<string | null>;
-    };
 
 export async function POST(req: Request) {
     const gate = await requireAdminApi(req);
     if (!gate.ok) return gate.response;
 
-    let body: PostBody;
+    let body: unknown;
     try {
-        body = (await req.json()) as PostBody;
+        body = await req.json();
     } catch {
         return NextResponse.json({ ok: false, message: 'Invalid JSON' }, { status: 400 });
     }
 
-    if (!body) return NextResponse.json({ ok: false, message: 'Invalid op' }, { status: 400 });
-
-    const supabase = getSupabaseAdmin();
-
-    if (body.op === 'replace_gallery_images') {
-        const countRaw = (body as any).count;
-        const countNum = Number(countRaw);
-        const count = Number.isFinite(countNum) ? Math.max(0, Math.min(100, Math.floor(countNum))) : NaN;
-        if (!Number.isFinite(count)) {
-            return NextResponse.json({ ok: false, message: 'Invalid count' }, { status: 400 });
+    try {
+        const input = mediaObject(body, 'request');
+        if (input.op === 'replace_gallery_images') {
+            const assetIds = parseGalleryAssetIds(input);
+            const supabase = getSupabaseAdmin();
+            const { error } = await (supabase as SupabaseClient).rpc('admin_replace_gallery_images', {
+                p_asset_ids: assetIds,
+            });
+            if (error) return mediaFailure(error, 'Failed to replace gallery images');
+            return NextResponse.json({ ok: true, count: assetIds.length });
         }
 
-        const assetIds = Array.isArray((body as any).asset_ids) ? ((body as any).asset_ids as Array<any>) : [];
-        const rows = Array.from({ length: count }, (_, i) => {
-            const raw = assetIds[i];
-            const asset_id = raw == null ? null : String(raw).trim() || null;
-            return {
-                slot_key: `gallery.images.${i}`,
-                asset_id,
-                sort: i,
-            };
+        if (input.op !== 'set') throw new MediaValidationError('Invalid op');
+        const slotKey = mediaSlotKey(input.slot_key);
+        const assetId = input.asset_id === null ? null : mediaUuid(input.asset_id, 'asset_id');
+        const sort = mediaSort(input.sort, true);
+        const supabase = getSupabaseAdmin();
+        const { error } = await (supabase as SupabaseClient).rpc('admin_set_media_slot', {
+            p_slot_key: slotKey,
+            p_asset_id: assetId,
+            p_sort: sort,
         });
-
-        // Delete everything under the prefix first to avoid mixed-key states.
-        const { error: delErr } = await supabase.from('media_slots').delete().like('slot_key', 'gallery.images.%');
-        if (delErr) return NextResponse.json({ ok: false, message: delErr.message }, { status: 500 });
-
-        if (rows.length) {
-            const { error: insErr } = await supabase.from('media_slots').insert(rows as any);
-            if (insErr) return NextResponse.json({ ok: false, message: insErr.message }, { status: 500 });
-        }
-
-        return NextResponse.json({ ok: true, count });
-    }
-
-    if (body.op !== 'set') {
-        return NextResponse.json({ ok: false, message: 'Invalid op' }, { status: 400 });
-    }
-
-    const slot_key = normalizeGalleryImagesSlotKey(String((body as any).slot_key || '').trim());
-    if (!slot_key) return NextResponse.json({ ok: false, message: 'Missing slot_key' }, { status: 400 });
-    if (slot_key.length > 128) return NextResponse.json({ ok: false, message: 'slot_key too long' }, { status: 400 });
-
-    const asset_id_raw = (body as any).asset_id;
-    const asset_id = asset_id_raw == null ? null : String(asset_id_raw).trim();
-    const sortRaw = (body as any).sort;
-    const sort = sortRaw == null ? null : Number(sortRaw);
-
-    if (!asset_id) {
-        const { error } = await supabase.from('media_slots').delete().eq('slot_key', slot_key);
-        if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+        if (error) return mediaFailure(error, 'Failed to save media slot');
         return NextResponse.json({ ok: true });
+    } catch (error: unknown) {
+        return mediaFailure(error, 'Failed to save media slots');
     }
-
-    const { error } = await supabase
-        .from('media_slots')
-        .upsert(
-            {
-                slot_key,
-                asset_id,
-                sort: Number.isFinite(sort as any) ? (sort as number) : null,
-            } as any,
-            { onConflict: 'slot_key' }
-        );
-
-    if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
 }

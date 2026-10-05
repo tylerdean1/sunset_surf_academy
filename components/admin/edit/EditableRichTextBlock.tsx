@@ -21,14 +21,6 @@ import useContentBundle from '@/hooks/useContentBundle';
 import { getSupabaseClient } from '@/lib/supabaseClient';
 import { rpc } from '@/lib/rpc';
 
-async function saveRich(pageKey: string, locale: string, json: string) {
-    const supabase = getSupabaseClient();
-    const payload: any = { p_page_key: pageKey };
-    if (locale === 'es') payload.p_body_es_draft = json;
-    else payload.p_body_en = json;
-    await rpc<void>(supabase, 'admin_upsert_page_content', payload);
-}
-
 export default function EditableRichTextBlock({
     cmsKey,
     value,
@@ -78,12 +70,11 @@ export default function EditableRichTextBlock({
         setSaving(true);
         setError(null);
         try {
-            await saveRich(cmsKey, locale, draft);
-
-            // If user generated/edited a Spanish draft while in EN, persist it too.
+            const strings = [{ key: cmsKey, locale: locale === 'es' ? 'es' : 'en', body: draft }];
             if (locale !== 'es' && showSpanishDraft && spanishDraft.trim()) {
-                await saveRich(cmsKey, 'es', spanishDraft);
+                strings.push({ key: cmsKey, locale: 'es', body: spanishDraft });
             }
+            await rpc<void>(getSupabaseClient(), 'admin_save_content_bundle', { p_strings: strings, p_media: [] });
 
             setSavedValue(draft);
             setEditing(false);

@@ -15,7 +15,7 @@ import { ADMIN_PAGES, type AdminPageKey } from './adminPages';
 import PageStructureWizard from '@/components/admin/wizard/PageStructureWizard';
 import PageContentWizard from '@/components/admin/wizard/PageContentWizard';
 
-import HomePage from '@/app/[locale]/page';
+import HomePage from '@/app/[locale]/HomePageClient';
 import LessonsPage from '@/app/[locale]/lessons/page';
 import MissionStatementPage from '@/app/[locale]/mission_statement/page';
 import TeamPage from '@/app/[locale]/team/page';
@@ -26,17 +26,17 @@ import AboutJazPage from '@/app/[locale]/about_jaz/page';
 import BookPage from '@/app/[locale]/book/page';
 import GalleryMediaSlotsEditor from '@/components/admin/GalleryMediaSlotsEditor';
 
-function pageComponent(page: AdminPageKey) {
+function LivePagePreview({ page }: { page: AdminPageKey }) {
     switch (page) {
-        case 'home': return HomePage;
-        case 'lessons': return LessonsPage;
-        case 'book': return BookPage;
-        case 'gallery': return GalleryPage;
-        case 'mission_statement': return MissionStatementPage;
-        case 'about_jaz': return AboutJazPage;
-        case 'team': return TeamPage;
-        case 'faq': return FaqPage;
-        case 'contact': return ContactPage;
+        case 'home': return <HomePage />;
+        case 'lessons': return <LessonsPage />;
+        case 'book': return <BookPage />;
+        case 'gallery': return <GalleryPage />;
+        case 'mission_statement': return <MissionStatementPage />;
+        case 'about_jaz': return <AboutJazPage />;
+        case 'team': return <TeamPage />;
+        case 'faq': return <FaqPage />;
+        case 'contact': return <ContactPage />;
         default: return null;
     }
 }
@@ -60,13 +60,6 @@ export default function AdminLiveEditor() {
     const page = String(pageParam || '') as AdminPageKey;
     if (!ADMIN_PAGES.includes(page)) {
         const msg = admin.t('admin.liveEditor.unknownPage', 'Unknown page: {page}').replace('{page}', String(pageParam));
-        return <Alert severity="error">{msg}</Alert>;
-    }
-
-    const Component = pageComponent(page);
-
-    if (!Component) {
-        const msg = admin.t('admin.liveEditor.unknownPage', 'Unknown page: {page}').replace('{page}', String(page));
         return <Alert severity="error">{msg}</Alert>;
     }
 
@@ -114,7 +107,7 @@ export default function AdminLiveEditor() {
                         },
                     }}
                 >
-                    <Component />
+                    <LivePagePreview key={page} page={page} />
                 </Box>
             </Box>
         </AdminEditProvider>

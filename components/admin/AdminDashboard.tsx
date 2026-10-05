@@ -20,8 +20,8 @@ function TabPanel({ value, index, children }: { value: number; index: number; ch
 export default function AdminDashboard() {
     const admin = useContentBundle('admin.');
     const [tab, setTab] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [authError, setAuthError] = useState<string | null>(null);
+    const loading = false;
+    const authError: string | null = null;
     const pathname = usePathname();
     const router = useRouter();
     const [selectedPage, setSelectedPage] = useState<AdminPageKey | ''>('');
@@ -31,13 +31,6 @@ export default function AdminDashboard() {
         const seg = p.split('/').filter(Boolean)[0];
         return seg === 'en' || seg === 'es' ? seg : 'en';
     })();
-
-    useEffect(() => {
-        // Auth is enforced by the server via the httpOnly `admin` cookie.
-        // Keeping this client component usable even if a Supabase session expires.
-        setLoading(false);
-        setAuthError(null);
-    }, []);
 
     const goToLiveEditor = (pageKey: string) => {
         const key = String(pageKey || '').trim();

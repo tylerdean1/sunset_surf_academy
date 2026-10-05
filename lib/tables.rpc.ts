@@ -5,6 +5,31 @@ import type { Database, Json } from './database.types';
 export type TableRpcMap = {
   admin_users: {
   },
+  booking_notifications: {
+    claim_booking_notifications: {
+      Args: {
+        p_booking_id?: string
+        p_limit?: number
+      }
+      Returns: {
+        attempts: number
+        booking_id: string
+        created_at: string
+        id: string
+        last_error: string | null
+        lease_expires_at: string | null
+        lease_token: string | null
+        next_attempt_at: string
+        payload: Json
+        provider_message_id: string | null
+        recipient_kind: string
+        status: string
+        updated_at: string
+      }[]
+    },
+  },
+  booking_request_rate_limits: {
+  },
   booking_requests: {
     admin_list_booking_requests: {
       Args: {
@@ -34,6 +59,8 @@ export type TableRpcMap = {
         requested_time_slots: string | null
         selected_time_slot: string | null
         status: Database["public"]["Enums"]["booking_request_status"]
+        submission_hash: string | null
+        submission_id: string | null
         updated_at: string
       }[]
     },

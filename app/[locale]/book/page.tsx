@@ -53,8 +53,8 @@ function BookInner() {
           {!emailDelivered ? (
             <Alert severity="warning" sx={{ mb: 4 }}>
               {locale === 'es'
-                ? 'Tu solicitud se guardó, pero no pudimos confirmar el envío de los correos. Si no recibes noticias, escríbenos a sunsetsurfacademy@gmail.com.'
-                : 'Your request was saved, but we could not confirm email delivery. If you do not hear from us, email sunsetsurfacademy@gmail.com.'}
+                ? 'Tu solicitud se guardó. Los correos de confirmación están en espera y volveremos a intentar enviarlos automáticamente. Si no recibes noticias, escríbenos a sunsetsurfacademy@gmail.com.'
+                : 'Your request was saved. Confirmation emails are queued, and we will retry sending them automatically. If you do not hear from us, email sunsetsurfacademy@gmail.com.'}
             </Alert>
           ) : null}
         </>

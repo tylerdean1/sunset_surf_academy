@@ -1,21 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import useCmsPageBody from '@/hooks/useCmsPageBody';
 import { useAdminEdit } from '@/components/admin/edit/AdminEditContext';
 import { useContentBundleContext } from '@/components/content/ContentBundleContext';
 import { getSupabaseClient } from '@/lib/supabaseClient';
 import { rpc } from '@/lib/rpc';
+import { cmsStringOrFallback } from '@/lib/cmsDraft';
+import { subscribeContentChanges } from '@/lib/contentCache';
 
 type AdminRow = {
     body_en: string | null;
     body_es_draft: string | null;
 };
-
-function isNonEmpty(value: string | null | undefined) {
-    return !!value && value.trim().length > 0;
-}
 
 async function fetchAdminRow(pageKey: string): Promise<AdminRow | null> {
     const supabase = getSupabaseClient();
@@ -37,38 +35,43 @@ export function useCmsStringValue(pageKey: string, fallback: string) {
     const bundle = useContentBundleContext();
     const bundledValue = useMemo(() => {
         const v = bundle?.strings?.[pageKey];
-        return isNonEmpty(v) ? (v as string) : null;
+        return typeof v === 'string' ? v : null;
     }, [bundle?.strings, pageKey]);
 
     // Public: prefer the per-route content bundle (1 fetch per route).
     // Fallback: reads published ES (if approved) or EN via security-definer RPC.
-    const publicCms = useCmsPageBody(pageKey, locale, !bundledValue);
+    const publicCms = useCmsPageBody(pageKey, locale, bundledValue === null);
     const publicValue = useMemo(() => {
-        if (bundledValue) return bundledValue;
+        if (bundledValue !== null) return bundledValue;
         const v = publicCms.body;
-        return isNonEmpty(v) ? (v as string) : fallback;
+        return cmsStringOrFallback(v, fallback);
     }, [bundledValue, publicCms.body, fallback]);
 
-    const [adminValue, setAdminValue] = useState<string | null>(null);
+    const adminKey = `${pageKey}::${locale}`;
+    const [adminState, setAdminState] = useState<{ key: string; value: string | null } | null>(null);
+    const adminValue = adminState?.key === adminKey ? adminState.value : null;
+    const [revision, setRevision] = useState(0);
+    const editRevision = useRef(0);
+    useEffect(() => subscribeContentChanges(() => setRevision((prev) => prev + 1)), []);
 
     useEffect(() => {
         let cancelled = false;
+        const editAtStart = editRevision.current;
         if (!enabled) {
-            setAdminValue(null);
-            return;
+            return () => { cancelled = true; };
         }
 
         (async () => {
             const row = await fetchAdminRow(pageKey);
-            if (cancelled) return;
+            if (cancelled || editRevision.current !== editAtStart) return;
             const v = locale === 'es' ? row?.body_es_draft : row?.body_en;
-            setAdminValue(isNonEmpty(v) ? (v as string) : null);
+            setAdminState({ key: adminKey, value: typeof v === 'string' ? v : null });
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [enabled, pageKey, locale]);
+    }, [enabled, pageKey, locale, revision, adminKey]);
 
     const value = enabled ? (adminValue ?? fallback) : publicValue;
 
@@ -76,7 +79,10 @@ export function useCmsStringValue(pageKey: string, fallback: string) {
         value,
         loading: enabled ? adminValue === null && false : publicCms.loading,
         error: enabled ? null : publicCms.error,
-        setLocalValue: setAdminValue,
+        setLocalValue: (value: string) => {
+            editRevision.current += 1;
+            setAdminState({ key: adminKey, value });
+        },
     };
 }
 

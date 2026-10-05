@@ -34,6 +34,7 @@ import type { Database } from '@/lib/database.types';
 import useContentBundle from '@/hooks/useContentBundle';
 import { getSupabaseClient } from '@/lib/supabaseClient';
 import { rpc } from '@/lib/rpc';
+import { expenseOutflowDollars } from '@/lib/financeCashflow';
 
 type LessonStatus = Database['public']['Enums']['lesson_status'];
 type LessonTypeRow = Database['public']['Tables']['lesson_types']['Row'];
@@ -121,12 +122,6 @@ function safeMoney(value: unknown): number {
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
     return Math.round(n * 100) / 100;
-}
-
-function centsToDollars(cents: unknown): number {
-    const n = Number(cents);
-    if (!Number.isFinite(n)) return 0;
-    return Math.round(n) / 100;
 }
 
 function parseDateKeyFromSessionTime(sessionTime: string | null): { y: number; m: number; d: number } | null {
@@ -374,8 +369,8 @@ export default function FinancesManager() {
             let expenseTotal = 0;
             let expenseCount = 0;
             for (const e of expensesFiltered) {
-                const signed = (e.is_refund ? -1 : 1) * centsToDollars(e.total_cents);
-                expenseTotal = Math.round((expenseTotal + signed) * 100) / 100;
+                const outflow = expenseOutflowDollars(e.total_cents);
+                expenseTotal = Math.round((expenseTotal + outflow) * 100) / 100;
                 expenseCount += 1;
 
                 const keyParts = parseDateKeyFromYmd(e.expense_date);
@@ -387,7 +382,7 @@ export default function FinancesManager() {
                         : `${keyParts.y}-${pad2(keyParts.m)}`;
 
                 const prev = pointsMap.get(period) || { period, revenue: 0, tips: 0, expenses: 0, count: 0 };
-                prev.expenses = Math.round((prev.expenses + signed) * 100) / 100;
+                prev.expenses = Math.round((prev.expenses + outflow) * 100) / 100;
                 pointsMap.set(period, prev);
             }
 

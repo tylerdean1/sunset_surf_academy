@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
     Alert,
     Box,
@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import useContentBundle from '@/hooks/useContentBundle';
 import { getSupabaseClient } from '@/lib/supabaseClient';
-import { rpc } from '@/lib/rpc';
+import { invalidateContentCache } from '@/lib/contentCache';
 
 type AssetType = 'photo' | 'video';
 type PhotoCategory = 'logo' | 'hero' | 'lessons' | 'web_content' | 'uncategorized';
@@ -27,32 +27,6 @@ type Mode = 'single' | 'bulk';
 const CATEGORIES: PhotoCategory[] = ['logo', 'hero', 'lessons', 'web_content', 'uncategorized'];
 const ASSET_TYPES: AssetType[] = ['photo', 'video'];
 const BUCKETS = ['Lesson_Photos', 'Private_Photos'] as const;
-
-function sanitizeFileName(name: string): string {
-    const justName = name.replace(/^.*[\\/]/, '');
-    return justName.replace(/[\\/]/g, '').trim();
-}
-
-function splitBaseExt(fileName: string): { base: string; ext: string } {
-    const idx = fileName.lastIndexOf('.');
-    if (idx <= 0) return { base: fileName, ext: '' };
-    return { base: fileName.slice(0, idx), ext: fileName.slice(idx) };
-}
-
-function normalizeFolder(folder: string): string {
-    const f = String(folder || '').trim().replace(/\\/g, '/');
-    const noLead = f.replace(/^\/+/, '');
-    const noTrail = noLead.replace(/\/+$/, '');
-    return noTrail;
-}
-
-function chooseUniqueName(existing: Set<string>, base: string, ext: string): string {
-    const candidate = `${base}${ext}`;
-    if (!existing.has(candidate)) return candidate;
-    let n = 1;
-    while (existing.has(`${base}(${n})${ext}`)) n++;
-    return `${base}(${n})${ext}`;
-}
 
 export default function MediaUpload() {
     const admin = useContentBundle('admin.');
@@ -76,8 +50,6 @@ export default function MediaUpload() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [uploaded, setUploaded] = useState<Array<{ bucket: string; path: string; id: string }>>([]);
-
-    const publicDefault = useMemo(() => bucket === 'Lesson_Photos', [bucket]);
 
     const categoryLabel = (c: PhotoCategory) => {
         const key = `admin.media.category.${c}`;
@@ -119,82 +91,55 @@ export default function MediaUpload() {
         }
 
         setLoading(true);
+        const results: Array<{ bucket: string; path: string; id: string }> = [];
+        let uploadAttempted = false;
         try {
             const supabase = getSupabaseClient();
             if (!supabase) throw new Error('Supabase client unavailable');
 
-            const folderNorm = normalizeFolder(folder);
-
-            // List existing names in folder to avoid overwrites.
-            const { data: existingList, error: listErr } = await supabase.storage
-                .from(bucket)
-                .list(folderNorm || '', { limit: 1000 });
-
-            if (listErr) throw new Error(listErr.message);
-            const existingNames = new Set((existingList ?? []).map((o: any) => String(o?.name || '')).filter(Boolean));
-
             const fileList = Array.from(files);
             const selectedFiles = mode === 'single' ? [fileList[0]] : fileList;
-
-            let bulkKeyIndex = 1;
-            const nextBulkAssetKey = () => {
-                const prefix = String(assetKeyPrefix || '').trim();
-                if (!prefix) return null;
-                const key = `${prefix}.${String(bulkKeyIndex).padStart(3, '0')}`;
-                bulkKeyIndex += 1;
-                return key;
-            };
-
-            const results: Array<{ bucket: string; path: string; id: string }> = [];
-
-            for (const file of selectedFiles) {
-                if (!file) continue;
-
-                const safeName = sanitizeFileName(file.name || 'file');
-                const { base, ext } = splitBaseExt(safeName);
-                const uniqueName = chooseUniqueName(existingNames, base || 'file', ext);
-                existingNames.add(uniqueName);
-
-                const uploadPath = folderNorm ? `${folderNorm}/${uniqueName}` : uniqueName;
-                const id = (globalThis.crypto as any)?.randomUUID ? (globalThis.crypto as any).randomUUID() : String(Date.now());
-
-                const { error: uploadErr } = await supabase.storage
-                    .from(bucket)
-                    .upload(uploadPath, file, { upsert: false, contentType: file.type || undefined });
-
-                if (uploadErr) throw new Error(uploadErr.message);
-
-                const derivedTitle = mode === 'single' ? String(title).trim() : `${safeName} (${id})`;
-                const derivedAssetKey = mode === 'single' ? (assetKey.trim() ? assetKey.trim() : null) : nextBulkAssetKey();
-
-                try {
-                    await rpc<any>(supabase, 'admin_upsert_media_asset', {
-                        p_id: id,
-                        p_title: derivedTitle,
-                        p_description: description || null,
-                        p_public: Boolean(isPublic),
-                        p_bucket: bucket,
-                        p_path: uploadPath,
-                        p_category: category,
-                        p_asset_type: assetType,
-                        p_sort: Number.isFinite(sort) ? sort : 32767,
-                        p_session_id: sessionId.trim() ? sessionId.trim() : null,
-                    });
-
-                    if (derivedAssetKey) {
-                        await rpc<void>(supabase, 'admin_set_media_slot', {
-                            p_slot_key: derivedAssetKey,
-                            p_asset_id: id,
-                            p_sort: Number.isFinite(sort) ? sort : 32767,
-                        });
-                    }
-                } catch (e: any) {
-                    // Best-effort cleanup of the uploaded file.
-                    await supabase.storage.from(bucket).remove([uploadPath]);
-                    throw e;
+            for (let index = 0; index < selectedFiles.length; index++) {
+                const file = selectedFiles[index];
+                const key = mode === 'single' ? assetKey.trim() : assetKeyPrefix.trim() ? `${assetKeyPrefix.trim()}.${String(index + 1).padStart(3, '0')}` : '';
+                const prepareResponse = await fetch('/api/admin/media/upload/prepare', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        folder,
+                        file_name: file.name,
+                        file_type: file.type,
+                        file_size: file.size,
+                        asset: {
+                            bucket,
+                            title: mode === 'single' ? title.trim() : file.name.replace(/^.*[\\/]/, '').trim().slice(0, 160),
+                            description: description || null,
+                            public: isPublic,
+                            category,
+                            asset_type: assetType,
+                            sort,
+                            session_id: sessionId.trim() || null,
+                            asset_key: key || null,
+                        },
+                    }),
+                });
+                const prepared = await prepareResponse.json().catch(() => null);
+                if (!prepareResponse.ok || !prepared?.ok || !prepared?.token || !prepared?.reservation) throw new Error(prepared?.message || 'Failed to prepare upload');
+                uploadAttempted = true;
+                const { error: uploadError } = await supabase.storage.from(prepared.bucket).uploadToSignedUrl(prepared.path, prepared.token, file, {
+                    contentType: prepared.content_type || file.type || undefined,
+                });
+                if (uploadError) throw new Error('File upload failed. Refresh Media before retrying.');
+                const finalizeResponse = await fetch('/api/admin/media/upload/finalize', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reservation: prepared.reservation }),
+                });
+                const finalized = await finalizeResponse.json().catch(() => null);
+                if (!finalizeResponse.ok || !finalized?.ok || !Array.isArray(finalized.uploaded) || !finalized.uploaded.length) {
+                    throw new Error(finalized?.message || 'Upload publication could not be confirmed. Refresh Media before retrying.');
                 }
-
-                results.push({ bucket, path: uploadPath, id });
+                results.push(...finalized.uploaded);
+                setUploaded([...results]);
+                invalidateContentCache();
             }
 
             setUploaded(results);
@@ -207,6 +152,9 @@ export default function MediaUpload() {
                 setAssetKeyPrefix('');
             }
         } catch (e: any) {
+            setUploaded([...results]);
+            if (uploadAttempted) setFiles(null);
+            if (results.length && mode === 'bulk') setAssetKeyPrefix('');
             setError(e?.message || admin.t('admin.upload.errors.uploadFailed', 'Upload failed'));
         } finally {
             setLoading(false);
@@ -276,7 +224,7 @@ export default function MediaUpload() {
                     </Box>
                 ) : (
                     <Box sx={{ display: 'grid', gap: 2 }}>
-                        <Alert severity="info">{admin.t('admin.upload.bulk.hint', 'Bulk titles are derived from the filename and a generated UUID.')}</Alert>
+                        <Alert severity="info">{admin.t('admin.upload.bulk.filenameTitles', 'Bulk titles are derived from the filename.')}</Alert>
                         <TextField
                             label={admin.t('admin.upload.fields.assetKeyPrefix', 'Asset Key Prefix (optional)')}
                             value={assetKeyPrefix}
@@ -350,16 +298,13 @@ export default function MediaUpload() {
                     />
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Checkbox checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-                        <Typography>{admin.t('admin.upload.fields.publicFlag', 'Public (DB flag)')}</Typography>
-                        {isPublic !== publicDefault ? (
-                            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                                {publicDefault
-                                    ? admin.t('admin.upload.publicDefault.public', 'Bucket default is public')
-                                    : admin.t('admin.upload.publicDefault.private', 'Bucket default is private')}
-                            </Typography>
-                        ) : null}
+                        <Typography>{admin.t('admin.upload.fields.showOnWebsite', 'Show on website')}</Typography>
                     </Box>
                 </Box>
+
+                <Typography variant="caption" color="text.secondary">
+                    {admin.t('admin.upload.visibilityHelp', 'Controls website visibility. Files in a public bucket remain accessible to anyone with the URL.')}
+                </Typography>
 
                 <Box>
                     <input

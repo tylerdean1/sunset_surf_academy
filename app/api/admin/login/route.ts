@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin';
 import { setAdminAccessTokenCookie } from '@/lib/adminAuth';
+import { sameOrigin } from '@/lib/adminOrigin';
 
 export async function POST(req: Request) {
+    if (!sameOrigin(req)) {
+        return NextResponse.json({ ok: false, message: 'Bad origin' }, { status: 403 });
+    }
     try {
         const body = await req.json();
         const accessToken = String(body?.access_token || '');

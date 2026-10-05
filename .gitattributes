@@ -1,0 +1,3 @@
+# Exact pg_dump output preserves live function and SQL string whitespace.
+lib/functions.sql -whitespace
+supabase/baseline.sql -whitespace

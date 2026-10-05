@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { requireAdminApi } from '@/lib/adminAuth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
     const gate = await requireAdminApi(req);
     if (!gate.ok) return gate.response;
@@ -21,5 +23,5 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, url: data?.signedUrl || '' });
+    return NextResponse.json({ ok: true, url: data?.signedUrl || '' }, { headers: { 'Cache-Control': 'private, no-store' } });
 }

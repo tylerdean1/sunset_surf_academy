@@ -23,9 +23,8 @@ import {
     Typography,
 } from '@mui/material';
 import useContentBundle from '@/hooks/useContentBundle';
-import { getSupabaseClient } from '@/lib/supabaseClient';
-import { rpc } from '@/lib/rpc';
-import { normalizeGalleryImagesSlotKey } from '@/lib/mediaSlots';
+import { getAdminMediaSignedUrl as getSignedUrl } from '@/lib/adminMediaClient';
+import { invalidateContentCache } from '@/lib/contentCache';
 
 type AssetType = 'photo' | 'video';
 type PhotoCategory = 'logo' | 'hero' | 'lessons' | 'web_content' | 'uncategorized';
@@ -48,14 +47,6 @@ type MediaAsset = {
 
 const CATEGORIES: PhotoCategory[] = ['logo', 'hero', 'lessons', 'web_content', 'uncategorized'];
 const ASSET_TYPES: AssetType[] = ['photo', 'video'];
-
-async function getSignedUrl(bucket: string, path: string): Promise<string> {
-    const supabase = getSupabaseClient();
-    if (!supabase) throw new Error('Supabase client unavailable');
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 900);
-    if (error) throw new Error(error.message);
-    return String((data as any)?.signedUrl || '');
-}
 
 export default function MediaManager() {
     const admin = useContentBundle('admin.');
@@ -116,9 +107,10 @@ export default function MediaManager() {
         setError(null);
 
         try {
-            const supabase = getSupabaseClient();
-            const rows = await rpc<MediaAsset[]>(supabase, 'admin_list_media_assets_with_key');
-            setItems((rows || []) as MediaAsset[]);
+            const response = await fetch('/api/admin/media/assets', { cache: 'no-store' });
+            const body = await response.json().catch(() => null);
+            if (!response.ok || !body?.ok || !Array.isArray(body.items)) throw new Error(body?.message || 'Failed to load media');
+            setItems(body.items as MediaAsset[]);
         } catch (e: any) {
             setError(e?.message || admin.t('admin.media.errors.loadFailed', 'Load failed'));
             setItems([]);
@@ -150,9 +142,6 @@ export default function MediaManager() {
         setError(null);
 
         try {
-            const supabase = getSupabaseClient();
-            if (!supabase) throw new Error('Supabase client unavailable');
-
             const titleTrim = String(title || '').trim();
             const bucketTrim = String(bucket || '').trim();
             const pathTrim = String(path || '').trim();
@@ -160,34 +149,26 @@ export default function MediaManager() {
             if (!bucketTrim) throw new Error('Missing bucket');
             if (!pathTrim) throw new Error('Missing path');
 
-            const saved = await rpc<any>(supabase, 'admin_upsert_media_asset', {
-                p_id: editing?.id || undefined,
-                p_title: titleTrim,
-                p_description: description || null,
-                p_public: Boolean(isPublic),
-                p_bucket: bucketTrim,
-                p_path: pathTrim,
-                p_category: category,
-                p_asset_type: assetType,
-                p_sort: Number.isFinite(sort) ? sort : 32767,
-                p_session_id: sessionId.trim() ? sessionId.trim() : null,
+            const response = await fetch('/api/admin/media/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ op: 'upsert', asset: {
+                    id: editing?.id || undefined,
+                    title: titleTrim,
+                    description: description || null,
+                    public: isPublic,
+                    bucket: bucketTrim,
+                    path: pathTrim,
+                    category,
+                    asset_type: assetType,
+                    sort,
+                    session_id: sessionId.trim() || null,
+                    asset_key: assetKey.trim() || null,
+                } }),
             });
-
-            const savedId = String(saved?.id || editing?.id || '').trim();
-            if (!savedId) throw new Error('Save failed');
-
-            const assetKeyRaw = assetKey.trim() ? assetKey.trim() : '';
-            const normalizedKey = normalizeGalleryImagesSlotKey(assetKeyRaw || null);
-            if (!assetKeyRaw) {
-                await rpc<void>(supabase, 'admin_clear_media_asset_slots', { p_asset_id: savedId });
-            } else if (normalizedKey) {
-                await rpc<void>(supabase, 'admin_set_media_slot', {
-                    p_slot_key: normalizedKey,
-                    p_asset_id: savedId,
-                    p_sort: Number.isFinite(sort) ? sort : 32767,
-                });
-            }
-
+            const body = await response.json().catch(() => null);
+            if (!response.ok || !body?.ok || !body?.item?.id) throw new Error(body?.message || 'Failed to save media');
+            invalidateContentCache();
             setDialogOpen(false);
             resetForm();
             await load();
@@ -234,7 +215,7 @@ export default function MediaManager() {
                             <TableCell>{admin.t('admin.media.table.title', 'Title')}</TableCell>
                             <TableCell>{admin.t('admin.media.table.category', 'Category')}</TableCell>
                             <TableCell>{admin.t('admin.media.table.type', 'Type')}</TableCell>
-                            <TableCell>{admin.t('admin.media.table.public', 'Public')}</TableCell>
+                            <TableCell>{admin.t('admin.media.table.showOnWebsite', 'Show on website')}</TableCell>
                             <TableCell>{admin.t('admin.media.table.bucketPath', 'Bucket / Path')}</TableCell>
                             <TableCell>{admin.t('admin.media.table.sort', 'Sort')}</TableCell>
                             <TableCell>{admin.t('admin.media.table.preview', 'Preview')}</TableCell>
@@ -382,8 +363,11 @@ export default function MediaManager() {
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Checkbox checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-                        <Typography>{admin.t('admin.media.fields.public', 'Public')}</Typography>
+                        <Typography>{admin.t('admin.media.fields.showOnWebsite', 'Show on website')}</Typography>
                     </Box>
+                    <Typography variant="body2" color="text.secondary">
+                        {admin.t('admin.media.visibilityHint', 'This controls whether the website displays this media. Files in a public storage bucket remain accessible through their existing URLs when hidden.')}
+                    </Typography>
 
                     {bucket && path ? (
                         <Typography variant="body2" color="text.secondary">

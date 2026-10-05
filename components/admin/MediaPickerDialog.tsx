@@ -24,6 +24,7 @@ import {
 import useContentBundle from '@/hooks/useContentBundle';
 import { getSupabaseClient } from '@/lib/supabaseClient';
 import { rpc } from '@/lib/rpc';
+import { getAdminMediaSignedUrl as fetchSignedUrl } from '@/lib/adminMediaClient';
 
 type AssetType = 'photo' | 'video';
 type PhotoCategory = 'logo' | 'hero' | 'lessons' | 'web_content' | 'uncategorized';
@@ -51,14 +52,6 @@ async function fetchAssets(): Promise<MediaAsset[]> {
     const supabase = getSupabaseClient();
     const rows = await rpc<MediaAsset[]>(supabase, 'admin_list_media_assets_with_key');
     return (rows || []) as MediaAsset[];
-}
-
-async function fetchSignedUrl(bucket: string, path: string): Promise<string> {
-    const supabase = getSupabaseClient();
-    if (!supabase) throw new Error('Supabase client unavailable');
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 900);
-    if (error) throw new Error(error.message);
-    return String((data as any)?.signedUrl || '');
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {

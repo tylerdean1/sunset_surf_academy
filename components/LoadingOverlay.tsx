@@ -51,13 +51,14 @@ export default function LoadingOverlay({
     const reducedMotion = usePrefersReducedMotion();
 
     const [minTimePassed, setMinTimePassed] = React.useState(false);
-    const [exiting, setExiting] = React.useState(false);
+    const [maxTimeoutReached, setMaxTimeoutReached] = React.useState(false);
     const [mounted, setMounted] = React.useState(true);
 
-    const start = React.useRef<number>(Date.now());
+    const start = React.useRef<number>(0);
     const maxTriggeredRef = React.useRef(false);
 
     React.useEffect(() => {
+        start.current = Date.now();
         const minTimer = window.setTimeout(() => setMinTimePassed(true), minMs);
 
         const maxTimer = window.setTimeout(() => {
@@ -70,7 +71,7 @@ export default function LoadingOverlay({
                     }ms)`
                 );
             }
-            setExiting(true);
+            setMaxTimeoutReached(true);
         }, maxMs);
 
         return () => {
@@ -79,13 +80,7 @@ export default function LoadingOverlay({
         };
     }, [minMs, maxMs]);
 
-    const shouldBeginExit = appReady && minTimePassed;
-
-    React.useEffect(() => {
-        if (!mounted) return;
-        if (!shouldBeginExit) return;
-        setExiting(true);
-    }, [shouldBeginExit, mounted]);
+    const exiting = maxTimeoutReached || (appReady && minTimePassed);
 
     React.useEffect(() => {
         if (!exiting) return;

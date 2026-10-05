@@ -191,10 +191,10 @@ npm run build
 REM Regenerate Supabase types into lib/database.types.ts
 npm run typegen
 
-REM Regenerate backend.snapshot.md (+ backend.snapshot.sql if possible)
+REM Generate a real schema-only SQL snapshot and a fresh-database baseline
 npm run snapshot
 
-REM Convenience: typegen + snapshot
+REM Regenerate types, snapshot, RPCs, policies and function references
 npm run fulldb
 ```
 
@@ -202,7 +202,9 @@ npm run fulldb
 
 - Migrations live in `supabase/migrations/`.
 - Type generation writes to `lib/database.types.ts`.
-- Backend snapshots write to `backend.snapshot.md` (and `backend.snapshot.sql` when possible).
+- Snapshot generation requires a successful schema-only dump and writes `backend.snapshot.md`, `backend.snapshot.sql`, and its catalog metadata.
+- Local PostgreSQL client tools can use the authenticated linked Supabase CLI connection without Docker or a stored database password.
+- `supabase/baseline.sql` and its metadata are generated from the live application schema. [Database generation and bootstrap instructions](docs/database-bootstrap.md) explain fresh restoration, extension requirements and migration history.
 
 ## Deployment (Vercel)
 - Set environment variables from the `.env.local` list above.

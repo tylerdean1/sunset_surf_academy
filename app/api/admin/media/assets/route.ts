@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import type { Database } from '@/lib/database.types';
 import { requireAdminApi } from '@/lib/adminAuth';
-import { normalizeGalleryImagesSlotKey } from '@/lib/mediaSlots';
+import { mediaFailure, mediaObject, MediaValidationError, parseMediaAsset, savedMediaAsset } from '@/lib/adminMediaValidation';
 
 type MediaAssetRow = Database['public']['Tables']['media_assets']['Row'];
-type MediaAssetInsert = Database['public']['Tables']['media_assets']['Insert'];
 
 type MediaAssetWithKey = MediaAssetRow & { asset_key: string | null };
 
@@ -24,13 +24,13 @@ export async function GET(req: Request) {
         .order('created_at', { ascending: false });
 
     if (error) {
-        return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+        return NextResponse.json({ ok: false, message: 'Failed to load media assets' }, { status: 500 });
     }
 
     const assets = (data ?? []) as MediaAssetRow[];
     const ids = assets.map((a) => a.id).filter(Boolean);
 
-    let slotMap = new Map<string, string[]>();
+    const slotMap = new Map<string, string[]>();
     if (ids.length) {
         const { data: slots, error: slotsErr } = await supabase
             .from('media_slots')
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
             .in('asset_id', ids);
 
         if (slotsErr) {
-            return NextResponse.json({ ok: false, message: slotsErr.message }, { status: 500 });
+            return NextResponse.json({ ok: false, message: 'Failed to load media slots' }, { status: 500 });
         }
 
         for (const s of slots ?? []) {
@@ -59,95 +59,31 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, items });
 }
 
-type PostBody =
-    | {
-        op: 'upsert';
-        asset: {
-            asset_key?: string | null;
-            id?: string;
-            title: string;
-            description?: string | null;
-            public: boolean;
-            bucket: string;
-            path: string;
-            category: Database['public']['Enums']['photo_category'];
-            asset_type: Database['public']['Enums']['asset_type'];
-            sort?: number;
-            session_id?: string | null;
-        };
-    };
-
 export async function POST(req: Request) {
     const gate = await requireAdminApi(req);
     if (!gate.ok) return gate.response;
 
-    let body: PostBody;
+    let body: unknown;
     try {
-        body = (await req.json()) as PostBody;
+        body = await req.json();
     } catch {
         return NextResponse.json({ ok: false, message: 'Invalid JSON' }, { status: 400 });
     }
 
-    if (!body || body.op !== 'upsert') {
-        return NextResponse.json({ ok: false, message: 'Invalid op' }, { status: 400 });
+    try {
+        const input = mediaObject(body, 'request');
+        if (input.op !== 'upsert') throw new MediaValidationError('Invalid op');
+        const { asset, assetKey, slotKeys } = parseMediaAsset(input.asset);
+        const supabase = getSupabaseAdmin();
+        const { data, error } = await (supabase as SupabaseClient).rpc('admin_save_media_asset', {
+            p_asset: asset,
+            p_slot_keys: slotKeys,
+        });
+        if (error) return mediaFailure(error, 'Failed to save media asset');
+        const saved = savedMediaAsset(data);
+        if (!saved?.id) return mediaFailure(null, 'Failed to save media asset');
+        return NextResponse.json({ ok: true, item: { ...saved, asset_key: assetKey } as MediaAssetWithKey });
+    } catch (error: unknown) {
+        return mediaFailure(error, 'Failed to save media asset');
     }
-
-    const a = body.asset as any;
-
-    const title = String(a?.title ?? '').trim();
-    const bucket = String(a?.bucket ?? '').trim();
-    const path = String(a?.path ?? '').trim();
-
-    if (!title) return NextResponse.json({ ok: false, message: 'Missing title' }, { status: 400 });
-    if (!bucket) return NextResponse.json({ ok: false, message: 'Missing bucket' }, { status: 400 });
-    if (!path) return NextResponse.json({ ok: false, message: 'Missing path' }, { status: 400 });
-
-    const supabase = getSupabaseAdmin();
-
-    const assetKeyRaw = a?.asset_key;
-    const assetKeyUnnormalized = assetKeyRaw != null && String(assetKeyRaw).trim() ? String(assetKeyRaw).trim() : null;
-    const assetKey = normalizeGalleryImagesSlotKey(assetKeyUnnormalized);
-    const wantsClearAssetKey = assetKeyRaw === null;
-
-    const insert: MediaAssetInsert = {
-        id: a?.id ? String(a.id) : undefined,
-        title,
-        description: a?.description ?? null,
-        public: Boolean(a?.public),
-        bucket,
-        path,
-        category: a?.category,
-        asset_type: a?.asset_type,
-        sort: Number.isFinite(a?.sort) ? Number(a.sort) : 32767,
-        session_id: a?.session_id ? String(a.session_id) : null,
-    };
-
-    const { data, error } = await supabase
-        .from('media_assets')
-        .upsert(insert, { onConflict: 'bucket,path' })
-        .select('*')
-        .maybeSingle();
-
-    if (error) {
-        return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
-    }
-
-    const saved = data as MediaAssetRow | null;
-    if (saved?.id) {
-        if (wantsClearAssetKey) {
-            const { error: delErr } = await supabase.from('media_slots').delete().eq('asset_id', saved.id);
-            if (delErr) {
-                return NextResponse.json({ ok: false, message: delErr.message }, { status: 500 });
-            }
-        } else if (assetKey) {
-            const { error: slotErr } = await supabase
-                .from('media_slots')
-                .upsert({ slot_key: assetKey, asset_id: saved.id, sort: insert.sort }, { onConflict: 'slot_key' });
-            if (slotErr) {
-                return NextResponse.json({ ok: false, message: slotErr.message }, { status: 500 });
-            }
-        }
-    }
-
-    return NextResponse.json({ ok: true, item: saved ? ({ ...saved, asset_key: assetKey } as MediaAssetWithKey) : null });
 }

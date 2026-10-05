@@ -1,62 +1,47 @@
 import { NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
-import type { Database } from '@/lib/database.types';
 import { requireAdminApi } from '@/lib/adminAuth';
+import { mediaErrorCode, mediaFailure, mediaSlotKey, mediaText, MediaValidationError, parseMediaAsset, savedMediaAsset } from '@/lib/adminMediaValidation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_BUCKETS = new Set(['Private_Photos', 'Lesson_Photos']);
 
-type PhotoCategory = Database['public']['Enums']['photo_category'];
-type AssetType = Database['public']['Enums']['asset_type'];
-type MediaAssetInsert = Database['public']['Tables']['media_assets']['Insert'];
+function formString(form: FormData, key: string, fallback = ''): string {
+    const value = form.get(key);
+    if (value === null) return fallback;
+    if (typeof value !== 'string') throw new MediaValidationError(`Invalid ${key}`);
+    return value.trim();
+}
 
-function sanitizeFileName(name: string): string {
-    // Remove any path parts and disallow separators.
-    const justName = name.replace(/^.*[\\/]/, '');
-    return justName.replace(/[\\/]/g, '').trim();
+function formBoolean(form: FormData, key: string, fallback: boolean): boolean {
+    if (!form.has(key)) return fallback;
+    const value = formString(form, key).toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(value)) return true;
+    if (['0', 'false', 'no', 'off'].includes(value)) return false;
+    throw new MediaValidationError(`Invalid ${key}`);
+}
+
+function uploadPath(path: string): string {
+    mediaText(path, 'path', 1024);
+    if (/[\u0000-\u001f\u007f]/.test(path) || path.split('/').some((part) => !part || part === '.' || part === '..')) {
+        throw new MediaValidationError('Invalid upload path');
+    }
+    return path;
 }
 
 function splitBaseExt(fileName: string): { base: string; ext: string } {
-    const idx = fileName.lastIndexOf('.');
-    if (idx <= 0) return { base: fileName, ext: '' };
-    return { base: fileName.slice(0, idx), ext: fileName.slice(idx) };
-}
-
-function normalizeFolder(folder: string): string {
-    const f = String(folder || '').trim().replace(/\\/g, '/');
-    const noLead = f.replace(/^\/+/, '');
-    const noTrail = noLead.replace(/\/+$/, '');
-    return noTrail;
+    const index = fileName.lastIndexOf('.');
+    return index <= 0 ? { base: fileName, ext: '' } : { base: fileName.slice(0, index), ext: fileName.slice(index) };
 }
 
 function chooseUniqueName(existing: Set<string>, base: string, ext: string): string {
-    const candidate = `${base}${ext}`;
-    if (!existing.has(candidate)) return candidate;
-    let n = 1;
-    while (existing.has(`${base}(${n})${ext}`)) n++;
-    return `${base}(${n})${ext}`;
-}
-
-async function listExistingNames(bucket: string, folder: string): Promise<Set<string>> {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.storage.from(bucket).list(folder || '', { limit: 1000 });
-    if (error) throw new Error(error.message);
-    return new Set((data ?? []).map((o) => o.name));
-}
-
-function parseBool(value: FormDataEntryValue | null, fallback: boolean): boolean {
-    if (value == null) return fallback;
-    const s = String(value).trim().toLowerCase();
-    if (s === '1' || s === 'true' || s === 'yes' || s === 'on') return true;
-    if (s === '0' || s === 'false' || s === 'no' || s === 'off') return false;
-    return fallback;
-}
-
-function parseIntOr(value: FormDataEntryValue | null, fallback: number): number {
-    const n = parseInt(String(value ?? ''), 10);
-    return Number.isFinite(n) ? n : fallback;
+    let name = `${base}${ext}`;
+    let number = 1;
+    while (existing.has(name)) name = `${base}(${number++})${ext}`;
+    return name;
 }
 
 export async function POST(req: Request) {
@@ -70,108 +55,97 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, message: 'Expected multipart/form-data' }, { status: 400 });
     }
 
-    const bucket = String(form.get('bucket') || '').trim();
-    const folder = normalizeFolder(String(form.get('folder') || ''));
-    const mode = String(form.get('mode') || 'single').trim();
-
-    if (!bucket) return NextResponse.json({ ok: false, message: 'Missing bucket' }, { status: 400 });
-    if (!ALLOWED_BUCKETS.has(bucket)) {
-        return NextResponse.json({ ok: false, message: `Invalid bucket. Use Private_Photos or Lesson_Photos.` }, { status: 400 });
-    }
-
-    const files = form.getAll('files').filter((f): f is File => f instanceof File);
-    if (!files.length) return NextResponse.json({ ok: false, message: 'No files uploaded' }, { status: 400 });
-
-    const isPublic = parseBool(form.get('public'), bucket === 'Lesson_Photos');
-    const category = String(form.get('category') || 'uncategorized') as PhotoCategory;
-    const assetType = String(form.get('asset_type') || 'photo') as AssetType;
-    const description = String(form.get('description') || '').trim();
-    const assetKey = String(form.get('asset_key') || '').trim();
-    const assetKeyPrefix = String(form.get('asset_key_prefix') || '').trim();
-    const sessionId = String(form.get('session_id') || '').trim();
-    const sort = parseIntOr(form.get('sort'), 32767);
-
-    if (mode !== 'single' && mode !== 'bulk') {
-        return NextResponse.json({ ok: false, message: 'Invalid mode' }, { status: 400 });
-    }
-
-    const singleTitle = String(form.get('title') || '').trim();
-    if (mode === 'single' && !singleTitle) {
-        return NextResponse.json({ ok: false, message: 'Missing title (single upload)' }, { status: 400 });
-    }
-
-    const supabase = getSupabaseAdmin();
-
-    let existingNames: Set<string>;
-    try {
-        existingNames = await listExistingNames(bucket, folder);
-    } catch (e: any) {
-        return NextResponse.json({ ok: false, message: e?.message || 'Failed to list bucket' }, { status: 500 });
-    }
-
     const uploaded: Array<{ bucket: string; path: string; id: string }> = [];
+    try {
+        const bucket = formString(form, 'bucket');
+        if (!ALLOWED_BUCKETS.has(bucket)) throw new MediaValidationError('Invalid bucket. Use Private_Photos or Lesson_Photos.');
+        const folder = formString(form, 'folder').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        if (folder) uploadPath(folder);
+        const mode = formString(form, 'mode', 'single');
+        if (mode !== 'single' && mode !== 'bulk') throw new MediaValidationError('Invalid mode');
 
-    let bulkKeyIndex = 1;
-    const nextBulkAssetKey = () => {
-        if (!assetKeyPrefix) return null;
-        const key = `${assetKeyPrefix}.${String(bulkKeyIndex).padStart(3, '0')}`;
-        bulkKeyIndex += 1;
-        return key;
-    };
-
-    for (const file of files) {
-        const safeName = sanitizeFileName(file.name || 'file');
-        const { base, ext } = splitBaseExt(safeName);
-        const uniqueName = chooseUniqueName(existingNames, base || 'file', ext);
-        existingNames.add(uniqueName);
-
-        const path = folder ? `${folder}/${uniqueName}` : uniqueName;
-        const id = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now());
-
-        const { error: uploadErr } = await supabase.storage
-            .from(bucket)
-            .upload(path, file, { upsert: false, contentType: file.type || undefined });
-
-        if (uploadErr) {
-            return NextResponse.json({ ok: false, message: uploadErr.message }, { status: 500 });
+        const entries = form.getAll('files');
+        if (!entries.length || entries.length > 100 || entries.some((entry) => typeof entry === 'string' || !entry.size)) {
+            throw new MediaValidationError('Upload from 1 to 100 nonempty files');
         }
+        if (mode === 'single' && entries.length !== 1) throw new MediaValidationError('Single mode requires one file');
+        const files = entries as File[];
+        const assetKey = formString(form, 'asset_key');
+        const assetKeyPrefix = formString(form, 'asset_key_prefix');
+        if (assetKey) mediaSlotKey(assetKey);
+        if (assetKeyPrefix) mediaSlotKey(`${assetKeyPrefix}.001`);
+        const sortText = formString(form, 'sort', '32767');
+        if (!/^-?[0-9]+$/.test(sortText)) throw new MediaValidationError('Invalid sort');
 
-        uploaded.push({ bucket, path, id });
-
-        const derivedTitle = mode === 'single' ? singleTitle : `${safeName} (${id})`;
-        const derivedAssetKey = mode === 'single' ? (assetKey || null) : nextBulkAssetKey();
-
-        const row: MediaAssetInsert = {
-            id,
+        // Validate all metadata and filenames before the first storage mutation.
+        const { asset: metadata } = parseMediaAsset({
+            title: mode === 'single' ? formString(form, 'title') : 'Upload',
             bucket,
-            path,
-            title: derivedTitle,
-            public: isPublic,
-            category,
-            asset_type: assetType,
-            description: description || null,
-            session_id: sessionId ? sessionId : null,
-            sort,
-        };
+            path: 'upload',
+            public: formBoolean(form, 'public', bucket === 'Lesson_Photos'),
+            category: formString(form, 'category', 'uncategorized'),
+            asset_type: formString(form, 'asset_type', 'photo'),
+            description: formString(form, 'description') || null,
+            session_id: formString(form, 'session_id') || null,
+            sort: Number(sortText),
+        });
+        const fileNames = files.map((file) => {
+            const name = (file.name || 'file').replace(/^.*[\\/]/, '').trim();
+            uploadPath(folder ? `${folder}/${name}` : name);
+            return name;
+        });
 
-        const { error: insertErr } = await supabase.from('media_assets').insert(row);
-        if (insertErr) {
-            // Best-effort cleanup.
-            await supabase.storage.from(bucket).remove([path]);
-            return NextResponse.json({ ok: false, message: insertErr.message }, { status: 500 });
-        }
+        const supabase = getSupabaseAdmin();
+        const { data: existing, error: listError } = await supabase.storage.from(bucket).list(folder, { limit: 1000 });
+        if (listError) return mediaFailure(null, 'Failed to list the upload folder');
+        const existingNames = new Set((existing ?? []).map((entry) => entry.name));
+        const pending = fileNames.map((fileName, index) => {
+            const { base, ext } = splitBaseExt(fileName);
+            const name = chooseUniqueName(existingNames, base, ext);
+            existingNames.add(name);
+            const path = uploadPath(folder ? `${folder}/${name}` : name);
+            const key = mode === 'single' ? assetKey : assetKeyPrefix ? `${assetKeyPrefix}.${String(index + 1).padStart(3, '0')}` : '';
+            return {
+                file: files[index],
+                path,
+                // Bulk uploads derive a readable title within the asset title limit.
+                asset: { ...metadata, path, title: mode === 'single' ? metadata.title : fileName.slice(0, 160) },
+                slotKeys: key ? [mediaSlotKey(key)] : null,
+            };
+        });
 
-        if (derivedAssetKey) {
-            const { error: slotErr } = await supabase
-                .from('media_slots')
-                .upsert({ slot_key: derivedAssetKey, asset_id: id, sort }, { onConflict: 'slot_key' });
-            if (slotErr) {
-                await supabase.storage.from(bucket).remove([path]);
-                await supabase.from('media_assets').delete().eq('id', id);
-                return NextResponse.json({ ok: false, message: slotErr.message }, { status: 500 });
+        for (const item of pending) {
+            const { error: uploadError } = await supabase.storage.from(bucket).upload(item.path, item.file, {
+                upsert: false,
+                contentType: item.file.type || undefined,
+            });
+            if (uploadError) return withUploaded(mediaFailure(null, 'Failed to upload media file'), uploaded);
+
+            // Asset and slot publication commit together. The database assigns new IDs.
+            const { data, error } = await (supabase as SupabaseClient).rpc('admin_save_media_asset', {
+                p_asset: item.asset,
+                p_slot_keys: item.slotKeys,
+            });
+            if (error) {
+                // A SQLSTATE proves the transaction was rejected. Network/PostgREST
+                // failures can have an unknown commit result, so retain the object.
+                const code = mediaErrorCode(error);
+                if (/^[0-9A-Z]{5}$/.test(code)) {
+                    try { await supabase.storage.from(bucket).remove([item.path]); } catch { /* Retain on cleanup failure. */ }
+                }
+                return withUploaded(mediaFailure(error, 'Failed to save uploaded media; refresh Media before retrying'), uploaded);
             }
+            const saved = savedMediaAsset(data);
+            if (!saved?.id) return withUploaded(mediaFailure(null, 'Upload result could not be confirmed; refresh Media before retrying'), uploaded);
+            uploaded.push({ bucket, path: item.path, id: saved.id });
         }
+        return NextResponse.json({ ok: true, uploaded });
+    } catch (error: unknown) {
+        return withUploaded(mediaFailure(error, 'Upload result could not be confirmed; refresh Media before retrying'), uploaded);
     }
+}
 
-    return NextResponse.json({ ok: true, uploaded });
+async function withUploaded(response: NextResponse, uploaded: Array<{ bucket: string; path: string; id: string }>): Promise<NextResponse> {
+    const body = await response.json();
+    return NextResponse.json({ ...body, uploaded }, { status: response.status });
 }

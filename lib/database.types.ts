@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   auth: {
     Tables: {
@@ -48,6 +48,7 @@ export type Database = {
           client_id: string
           client_secret: string
           created_at: string
+          custom_claims_allowlist: string[]
           discovery_cached_at: string | null
           discovery_url: string | null
           email_optional: boolean
@@ -74,6 +75,7 @@ export type Database = {
           client_id: string
           client_secret: string
           created_at?: string
+          custom_claims_allowlist?: string[]
           discovery_cached_at?: string | null
           discovery_url?: string | null
           email_optional?: boolean
@@ -100,6 +102,7 @@ export type Database = {
           client_id?: string
           client_secret?: string
           created_at?: string
+          custom_claims_allowlist?: string[]
           discovery_cached_at?: string | null
           discovery_url?: string | null
           email_optional?: boolean
@@ -379,6 +382,83 @@ export type Database = {
           },
         ]
       }
+      mfa_recovery_code_sets: {
+        Row: {
+          created_at: string
+          failed_verification_count: number
+          id: string
+          mfa_factor_id: string
+          updated_at: string
+          user_id: string
+          verification_locked_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          failed_verification_count?: number
+          id: string
+          mfa_factor_id: string
+          updated_at?: string
+          user_id: string
+          verification_locked_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          failed_verification_count?: number
+          id?: string
+          mfa_factor_id?: string
+          updated_at?: string
+          user_id?: string
+          verification_locked_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mfa_recovery_code_sets_mfa_factor_id_fkey"
+            columns: ["mfa_factor_id"]
+            isOneToOne: true
+            referencedRelation: "mfa_factors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mfa_recovery_code_sets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          id: string
+          mfa_recovery_code_set_id: string
+        }
+        Insert: {
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          id: string
+          mfa_recovery_code_set_id: string
+        }
+        Update: {
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          mfa_recovery_code_set_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mfa_recovery_codes_mfa_recovery_code_set_id_fkey"
+            columns: ["mfa_recovery_code_set_id"]
+            isOneToOne: false
+            referencedRelation: "mfa_recovery_code_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oauth_authorizations: {
         Row: {
           approved_at: string | null
@@ -574,6 +654,7 @@ export type Database = {
       one_time_tokens: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
           relates_to: string
           token_hash: string
@@ -583,6 +664,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id: string
           relates_to: string
           token_hash: string
@@ -592,6 +674,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           relates_to?: string
           token_hash?: string
@@ -756,6 +839,101 @@ export type Database = {
           version?: string
         }
         Relationships: []
+      }
+      scim_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_used_at: string | null
+          prefix: string
+          revoked_at: string | null
+          sso_provider_id: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id: string
+          last_used_at?: string | null
+          prefix: string
+          revoked_at?: string | null
+          sso_provider_id: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          prefix?: string
+          revoked_at?: string | null
+          sso_provider_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scim_tokens_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scim_users: {
+        Row: {
+          active: boolean
+          created_at: string
+          deleted_at: string | null
+          external_id: string | null
+          id: string
+          resource: Json
+          sso_provider_id: string
+          updated_at: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id: string
+          resource: Json
+          sso_provider_id: string
+          updated_at?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          resource?: Json
+          sso_provider_id?: string
+          updated_at?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scim_users_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scim_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sessions: {
         Row: {
@@ -996,6 +1174,100 @@ export type Database = {
         }
         Relationships: []
       }
+      webauthn_challenges: {
+        Row: {
+          challenge_type: string
+          created_at: string
+          expires_at: string
+          id: string
+          session_data: Json
+          user_id: string | null
+        }
+        Insert: {
+          challenge_type: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          session_data: Json
+          user_id?: string | null
+        }
+        Update: {
+          challenge_type?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          session_data?: Json
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webauthn_challenges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webauthn_credentials: {
+        Row: {
+          aaguid: string | null
+          attestation_type: string
+          backed_up: boolean
+          backup_eligible: boolean
+          created_at: string
+          credential_id: string
+          friendly_name: string
+          id: string
+          last_used_at: string | null
+          public_key: string
+          sign_count: number
+          transports: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aaguid?: string | null
+          attestation_type?: string
+          backed_up?: boolean
+          backup_eligible?: boolean
+          created_at?: string
+          credential_id: string
+          friendly_name?: string
+          id?: string
+          last_used_at?: string | null
+          public_key: string
+          sign_count?: number
+          transports?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aaguid?: string | null
+          attestation_type?: string
+          backed_up?: boolean
+          backup_eligible?: boolean
+          created_at?: string
+          credential_id?: string
+          friendly_name?: string
+          id?: string
+          last_used_at?: string | null
+          public_key?: string
+          sign_count?: number
+          transports?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webauthn_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1010,7 +1282,7 @@ export type Database = {
       aal_level: "aal1" | "aal2" | "aal3"
       code_challenge_method: "s256" | "plain"
       factor_status: "unverified" | "verified"
-      factor_type: "totp" | "webauthn" | "phone"
+      factor_type: "totp" | "webauthn" | "phone" | "recovery_code"
       oauth_authorization_status: "pending" | "approved" | "denied" | "expired"
       oauth_client_type: "public" | "confidential"
       oauth_registration_type: "dynamic" | "manual"
@@ -1053,6 +1325,80 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_notifications: {
+        Row: {
+          attempts: number
+          booking_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_token: string | null
+          next_attempt_at: string
+          payload: Json
+          provider_message_id: string | null
+          recipient_kind: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          booking_id: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          next_attempt_at?: string
+          payload: Json
+          provider_message_id?: string | null
+          recipient_kind: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          booking_id?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          next_attempt_at?: string
+          payload?: Json
+          provider_message_id?: string | null
+          recipient_kind?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_notifications_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_request_rate_limits: {
+        Row: {
+          key: string
+          requests: number
+          window_start: string
+        }
+        Insert: {
+          key: string
+          requests: number
+          window_start: string
+        }
+        Update: {
+          key?: string
+          requests?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       booking_requests: {
         Row: {
           amount_paid_cents: number
@@ -1078,6 +1424,8 @@ export type Database = {
           requested_time_slots: string | null
           selected_time_slot: string | null
           status: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash: string | null
+          submission_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1104,6 +1452,8 @@ export type Database = {
           requested_time_slots?: string | null
           selected_time_slot?: string | null
           status?: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash?: string | null
+          submission_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1130,6 +1480,8 @@ export type Database = {
           requested_time_slots?: string | null
           selected_time_slot?: string | null
           status?: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash?: string | null
+          submission_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1604,6 +1956,8 @@ export type Database = {
           requested_time_slots: string | null
           selected_time_slot: string | null
           status: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash: string | null
+          submission_id: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -1768,6 +2122,8 @@ export type Database = {
           requested_time_slots: string | null
           selected_time_slot: string | null
           status: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash: string | null
+          submission_id: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -1828,6 +2184,8 @@ export type Database = {
           requested_time_slots: string | null
           selected_time_slot: string | null
           status: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash: string | null
+          submission_id: string | null
           updated_at: string
         }[]
         SetofOptions: {
@@ -2038,11 +2396,73 @@ export type Database = {
         }[]
       }
       admin_publish_es: { Args: { p_page_key: string }; Returns: undefined }
-      admin_replace_gallery_images: {
-        Args: { p_asset_ids?: string[]; p_count: number }
-        Returns: number
+      admin_relocate_receipt: {
+        Args: {
+          p_category: Database["public"]["Enums"]["finance_category"]
+          p_expected_path: string
+          p_id: string
+          p_new_path: string
+        }
+        Returns: {
+          category: Database["public"]["Enums"]["finance_category"]
+          created_at: string
+          description: string | null
+          expense_id: string | null
+          id: string
+          is_refund: boolean
+          notes: string | null
+          parent_receipt_id: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          receipt_date: string
+          receipt_storage_path: string
+          session_id: string | null
+          source_type: string | null
+          subtotal_cents: number | null
+          tax_cents: number | null
+          tip_cents: number | null
+          total_cents: number
+          transaction_id: string | null
+          updated_at: string
+          vendor_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "receipts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
+      admin_replace_gallery_images:
+        | { Args: { p_asset_ids: string[] }; Returns: undefined }
+        | { Args: { p_asset_ids?: string[]; p_count: number }; Returns: number }
       admin_restore_session: { Args: { p_id: string }; Returns: undefined }
+      admin_save_content_bundle: {
+        Args: { p_media: Json; p_strings: Json }
+        Returns: undefined
+      }
+      admin_save_media_asset: {
+        Args: { p_asset: Json; p_slot_keys?: string[] }
+        Returns: {
+          asset_type: Database["public"]["Enums"]["asset_type"]
+          bucket: string
+          category: Database["public"]["Enums"]["photo_category"]
+          created_at: string | null
+          description: string | null
+          id: string
+          path: string
+          public: boolean
+          session_id: string | null
+          sort: number
+          title: string
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "media_assets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_set_media_slot: {
         Args: { p_asset_id?: string; p_slot_key: string; p_sort?: number }
         Returns: undefined
@@ -2073,6 +2493,8 @@ export type Database = {
           requested_time_slots: string | null
           selected_time_slot: string | null
           status: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash: string | null
+          submission_id: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -2112,6 +2534,8 @@ export type Database = {
           requested_time_slots: string | null
           selected_time_slot: string | null
           status: Database["public"]["Enums"]["booking_request_status"]
+          submission_hash: string | null
+          submission_id: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -2361,9 +2785,46 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_booking_notifications: {
+        Args: { p_booking_id?: string; p_limit?: number }
+        Returns: {
+          attempts: number
+          booking_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_token: string | null
+          next_attempt_at: string
+          payload: Json
+          provider_message_id: string | null
+          recipient_kind: string
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "booking_notifications"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      complete_booking_notification: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_lease_token: string
+          p_provider_id?: string
+        }
+        Returns: undefined
+      }
       compute_booking_request_bill_total_cents: {
         Args: { p_lesson_type_key: string; p_party_size: number }
         Returns: number
+      }
+      configure_booking_email_worker: {
+        Args: { p_url: string }
+        Returns: undefined
       }
       get_page_content: {
         Args: { p_locale?: string; p_page_key: string }
@@ -2507,12 +2968,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      submit_booking_request: {
+        Args: { p_payload: Json; p_payload_hash: string; p_rate_key: string }
+        Returns: Json
+      }
       sync_media_assets_from_storage: {
         Args: never
         Returns: {
           inserted: number
           updated: number
         }[]
+      }
+      verify_booking_worker_secret: {
+        Args: { p_token: string }
+        Returns: boolean
       }
     }
     Enums: {
@@ -2563,12 +3032,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2592,11 +3061,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2617,11 +3086,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2642,11 +3111,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2659,11 +3128,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2678,7 +3147,7 @@ export const Constants = {
       aal_level: ["aal1", "aal2", "aal3"],
       code_challenge_method: ["s256", "plain"],
       factor_status: ["unverified", "verified"],
-      factor_type: ["totp", "webauthn", "phone"],
+      factor_type: ["totp", "webauthn", "phone", "recovery_code"],
       oauth_authorization_status: ["pending", "approved", "denied", "expired"],
       oauth_client_type: ["public", "confidential"],
       oauth_registration_type: ["dynamic", "manual"],

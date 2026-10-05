@@ -1,0 +1,7 @@
+node_modules
+.next15-deps-backup
+.next
+.git
+.env*
+supabase/.temp
+coverage

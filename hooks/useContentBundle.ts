@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
-import type { ContentBundleError, ContentBundleResponse, ContentBundleMediaItem } from '@/types/contentBundle';
+import type { ContentBundleMediaItem } from '@/types/contentBundle';
+import { acceptContentBundleSeed, contentBundleSnapshot, fetchContentBundle, subscribeContentChanges } from '@/lib/contentCache';
+import { usePublicContentSeed } from '@/components/content/PublicContentSeedContext';
 
 type Result = {
     prefix: string;
@@ -17,40 +19,8 @@ type Result = {
     mediaList: (slotKeyPrefix: string) => ContentBundleMediaItem[];
 };
 
-const cache = new Map<string, ContentBundleResponse>();
-const inflight = new Map<string, Promise<ContentBundleResponse>>();
-
 function normalizeLocale(raw: string): 'en' | 'es' {
     return raw === 'es' ? 'es' : 'en';
-}
-
-async function fetchBundle(locale: 'en' | 'es', prefix: string, mediaPrefix: string): Promise<ContentBundleResponse> {
-    const key = `${locale}::${prefix}::${mediaPrefix}`;
-    const cached = cache.get(key);
-    if (cached) return cached;
-
-    const existing = inflight.get(key);
-    if (existing) return existing;
-
-    const p = (async () => {
-        const params = new URLSearchParams({ locale, prefix });
-        if (mediaPrefix !== prefix) params.set('media_prefix', mediaPrefix);
-        const res = await fetch(`/api/content-bundle?${params.toString()}`);
-        const body = (await res.json().catch(() => null)) as ContentBundleResponse | ContentBundleError | null;
-        if (!res.ok || !body || (body as any).ok !== true) {
-            const msg = (body as any)?.message || `Failed to load content bundle (${res.status})`;
-            throw new Error(msg);
-        }
-        cache.set(key, body as ContentBundleResponse);
-        return body as ContentBundleResponse;
-    })();
-
-    inflight.set(key, p);
-    try {
-        return await p;
-    } finally {
-        inflight.delete(key);
-    }
 }
 
 function isDev() {
@@ -62,37 +32,45 @@ const missingLogged = new Set<string>();
 export default function useContentBundle(prefix: string, mediaPrefix?: string): Result {
     const locale = normalizeLocale(useLocale());
     const effectiveMediaPrefix = mediaPrefix ?? prefix;
+    const seed = usePublicContentSeed(locale, prefix, effectiveMediaPrefix);
+    const [revision, setRevision] = useState(0);
 
-    const [strings, setStrings] = useState<Record<string, string>>({});
-    const [media, setMedia] = useState<ContentBundleMediaItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const key = `${locale}::${prefix}::${effectiveMediaPrefix}`;
+    const [content, setContent] = useState(() => ({ key, seed, value: contentBundleSnapshot(locale, prefix, effectiveMediaPrefix, seed) }));
+    const current = contentBundleSnapshot(locale, prefix, effectiveMediaPrefix, seed)
+        ?? (content.key === key ? content.value : undefined);
+    const strings = current?.strings ?? {};
+    const media = current?.media ?? [];
+    const [loadingState, setLoadingState] = useState({ key, seed, loading: !seed });
+    const [errorState, setErrorState] = useState<{ key: string; seed: typeof seed; revision: number; message: string } | null>(null);
+    const loading = !current && (loadingState.key === key && loadingState.seed === seed ? loadingState.loading : true);
+    const error = errorState?.key === key && errorState.seed === seed && errorState.revision === revision
+        ? errorState.message : null;
+
+    useEffect(() => subscribeContentChanges(() => setRevision((prev) => prev + 1)), []);
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
-        setError(null);
+        acceptContentBundleSeed(seed);
 
         (async () => {
             try {
-                const b = await fetchBundle(locale, prefix, effectiveMediaPrefix);
+                const b = await fetchContentBundle(locale, prefix, effectiveMediaPrefix);
                 if (cancelled) return;
-                setStrings(b.strings || {});
-                setMedia(b.media || []);
-                setLoading(false);
+                setContent({ key, seed, value: b });
+                setLoadingState({ key, seed, loading: false });
+                setErrorState(null);
             } catch (e: any) {
                 if (cancelled) return;
-                setStrings({});
-                setMedia([]);
-                setError(e?.message || 'Failed to load content');
-                setLoading(false);
+                setErrorState({ key, seed, revision, message: e?.message || 'Failed to load content' });
+                setLoadingState({ key, seed, loading: false });
             }
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [locale, prefix, effectiveMediaPrefix]);
+    }, [locale, prefix, effectiveMediaPrefix, key, revision, seed]);
 
     const mediaBySlotKey = useMemo(() => {
         const map = new Map<string, ContentBundleMediaItem>();
@@ -111,7 +89,7 @@ export default function useContentBundle(prefix: string, mediaPrefix?: string): 
     const t = useMemo(() => {
         return (key: string, fallback?: string) => {
             const v = strings[key];
-            if (typeof v === 'string' && v.trim().length > 0) return v;
+            if (typeof v === 'string') return v;
 
             const hasFallback = typeof fallback === 'string' && fallback.trim().length > 0;
 

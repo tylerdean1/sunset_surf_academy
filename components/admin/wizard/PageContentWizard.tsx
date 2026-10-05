@@ -26,6 +26,8 @@ import { getSupabaseClient } from '@/lib/supabaseClient';
 import type { Database, Json } from '@/lib/database.types';
 import { PagePreviewRendererInner, type StagedContentMap, type StagedMediaMap } from '@/components/sections/PagePreviewRenderer';
 import { rpc } from '@/lib/rpc';
+import { getAdminMediaSignedUrl as fetchSignedUrl } from '@/lib/adminMediaClient';
+import { mergeLoadedCmsDraft, type DirtyCmsLocales } from '@/lib/cmsDraft';
 
 type CanonicalSectionKind = 'hero' | 'richText' | 'media' | 'card_group';
 type PageSectionRow = Database['public']['Functions']['rpc_get_page_sections']['Returns'][number];
@@ -42,19 +44,6 @@ async function adminGetCmsRow(pageKey: string): Promise<CmsRow | null> {
     const row = rows?.[0] ?? null;
     if (!row) return null;
     return { body_en: row.body_en ?? null, body_es_draft: row.body_es_draft ?? null };
-}
-
-async function adminSetMediaSlot(slotKey: string, assetId: string | null, sort: number) {
-    const supabase = getSupabaseClient();
-    await rpc<void>(supabase, 'admin_set_media_slot', { p_slot_key: slotKey, p_asset_id: assetId, p_sort: sort });
-}
-
-async function fetchSignedUrl(bucket: string, path: string): Promise<string> {
-    const supabase = getSupabaseClient();
-    if (!supabase) throw new Error('Supabase client unavailable');
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 900);
-    if (error) throw new Error(error.message);
-    return String((data as any)?.signedUrl || '');
 }
 
 function isAuthErrorMessage(message: string) {
@@ -153,7 +142,11 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     const [selectedSectionId, setSelectedSectionId] = React.useState<string>('');
 
     const [contentDraft, setContentDraft] = React.useState<Record<string, { en: string; es: string }>>({});
-    const [dirtyContentKeys, setDirtyContentKeys] = React.useState<Record<string, true>>({});
+    const [dirtyContentKeys, setDirtyContentKeys] = React.useState<Record<string, DirtyCmsLocales>>({});
+    const dirtyContentRef = React.useRef<Record<string, DirtyCmsLocales>>({});
+    const loadedCmsKeys = React.useRef(new Set<string>());
+    const generation = React.useRef(0);
+    const editRevision = React.useRef(0);
 
     // prefix -> list of items (each item has slot_key + asset info)
     const [baseSlotsByPrefix, setBaseSlotsByPrefix] = React.useState<Record<string, LoadedSlotItem[]>>({});
@@ -168,6 +161,9 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     const reloginHref = `/${locale}/adminlogin`;
 
     const closeWizard = () => {
+        generation.current += 1;
+        dirtyContentRef.current = {};
+        loadedCmsKeys.current.clear();
         setOpen(false);
         setTab('en');
         setError(null);
@@ -188,30 +184,39 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     const translate = admin.t;
     const loadSections = React.useCallback(async () => {
         if (!pageKey) return;
+        const startedGeneration = generation.current;
         setLoading(true);
         setError(null);
         setAuthError(null);
         try {
             const rows = await rpcGetPageSections(pageKey);
+            if (startedGeneration !== generation.current) return;
             const ordered = [...rows].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
             setSections(ordered);
             // default selection
             setSelectedSectionId((prev) => prev || (ordered[0]?.id ? String(ordered[0].id) : ''));
         } catch (e: any) {
+            if (startedGeneration !== generation.current) return;
             const msg = e?.message || translate('admin.common.loadFailed', 'Failed to load');
             if (isAuthErrorMessage(msg)) setAuthError(msg);
             else setError(msg);
             setSections([]);
             setSelectedSectionId('');
         } finally {
-            setLoading(false);
+            if (startedGeneration === generation.current) setLoading(false);
         }
     }, [translate, pageKey]);
 
     const openWizard = async () => {
+        generation.current += 1;
         setOpen(true);
         await loadSections();
     };
+
+    React.useEffect(() => {
+        closeWizard();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pageKey]);
 
     React.useEffect(() => {
         if (!props.autoOpen) return;
@@ -288,34 +293,42 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     React.useEffect(() => {
         if (!open) return;
         if (!selectedSection) return;
+        const startedGeneration = generation.current;
+        let cancelled = false;
 
         // Load any missing CMS keys for this section.
         void (async () => {
-            const missing = pointerKeys.cms.filter((k) => !(k in contentDraft));
+            const missing = pointerKeys.cms.filter((k) => !loadedCmsKeys.current.has(k));
             if (!missing.length) return;
             try {
                 const rows = await Promise.all(missing.map((k) => adminGetCmsRow(k)));
+                if (cancelled || startedGeneration !== generation.current) return;
+                missing.forEach((key) => loadedCmsKeys.current.add(key));
                 setContentDraft((prev) => {
                     const next = { ...prev };
                     for (let i = 0; i < missing.length; i++) {
                         const key = missing[i];
                         const r = rows[i];
-                        next[key] = { en: r?.body_en ?? '', es: r?.body_es_draft ?? '' };
+                        next[key] = mergeLoadedCmsDraft(prev[key], dirtyContentRef.current[key], r);
                     }
                     return next;
                 });
             } catch (e: any) {
+                if (cancelled || startedGeneration !== generation.current) return;
                 const msg = e?.message || admin.t('admin.common.loadFailed', 'Failed to load');
                 if (isAuthErrorMessage(msg)) setAuthError(msg);
                 else setError(msg);
             }
         })();
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, selectedSectionId]);
 
     React.useEffect(() => {
         if (!open) return;
         if (!selectedSection) return;
+        const startedGeneration = generation.current;
+        let cancelled = false;
 
         // Load media slots by exact key (single slots)
         void (async () => {
@@ -325,6 +338,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
 
             try {
                 const loaded = await Promise.all(missing.map((p) => loadSlotItemsByPrefix(p)));
+                if (cancelled || startedGeneration !== generation.current) return;
 
                 setBaseSlotsByPrefix((prev) => {
                     const next = { ...prev };
@@ -372,31 +386,40 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
                             }
                         })
                     );
+                    if (cancelled || startedGeneration !== generation.current) return;
+                    const urlByAsset = new Map(assets.map((asset, index) => [asset.id, urls[index]]));
                     setStagedSlotsByPrefix((prev) => {
                         const existing = prev[prefix] || [];
-                        const nextItems = existing.map((x, idx) => {
-                            const url = urls[idx] || '';
+                        const nextItems = existing.map((x) => {
                             if (!x.asset) return x;
+                            const url = urlByAsset.get(x.asset.id) || '';
                             return { ...x, asset: { ...x.asset, previewUrl: x.asset.previewUrl || url } };
                         });
                         return { ...prev, [prefix]: nextItems };
                     });
                 }
             } catch (e: any) {
+                if (cancelled || startedGeneration !== generation.current) return;
                 const msg = e?.message || admin.t('admin.common.loadFailed', 'Failed to load');
                 if (isAuthErrorMessage(msg)) setAuthError(msg);
                 else setError(msg);
             }
         })();
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, selectedSectionId]);
 
     const setCmsValue = (key: string, localeKey: 'en' | 'es', value: string) => {
+        editRevision.current += 1;
+        dirtyContentRef.current = {
+            ...dirtyContentRef.current,
+            [key]: { ...dirtyContentRef.current[key], [localeKey]: true },
+        };
         setContentDraft((prev) => ({
             ...prev,
             [key]: { en: prev[key]?.en ?? '', es: prev[key]?.es ?? '', [localeKey]: value },
         }));
-        setDirtyContentKeys((prev) => ({ ...prev, [key]: true }));
+        setDirtyContentKeys(dirtyContentRef.current);
     };
 
     const openPickerFor = (prefix: string, index: number) => {
@@ -405,6 +428,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     };
 
     const onPicked = async (sel: MediaSelection) => {
+        const startedGeneration = generation.current;
         const target = pickerTarget;
         setPickerOpen(false);
         setPickerTarget(null);
@@ -420,6 +444,8 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
                 previewUrl = '';
             }
         }
+        if (startedGeneration !== generation.current) return;
+        editRevision.current += 1;
 
         setStagedSlotsByPrefix((prev) => {
             const existing = [...(prev[prefix] || [])];
@@ -434,6 +460,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     };
 
     const clearSlotIndex = (prefix: string, index: number) => {
+        editRevision.current += 1;
         setStagedSlotsByPrefix((prev) => {
             const existing = [...(prev[prefix] || [])];
             if (!existing[index]) return prev;
@@ -445,6 +472,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     };
 
     const addCarouselItem = (prefix: string) => {
+        editRevision.current += 1;
         setStagedSlotsByPrefix((prev) => {
             const existing = [...(prev[prefix] || [])];
             const nextIndex = existing.length;
@@ -455,6 +483,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     };
 
     const moveCarouselItem = (prefix: string, index: number, dir: -1 | 1) => {
+        editRevision.current += 1;
         setStagedSlotsByPrefix((prev) => {
             const existing = [...(prev[prefix] || [])];
             const swap = index + dir;
@@ -470,12 +499,15 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     };
 
     const refresh = async () => {
+        const startedGeneration = generation.current;
         await loadSections();
+        if (startedGeneration !== generation.current) return;
         // keep drafts; content/media are cached, but reload base slot items for current pointers
         for (const p of [...pointerKeys.slots, ...pointerKeys.carouselPrefixes]) {
             if (!p) continue;
             try {
                 const base = await loadSlotItemsByPrefix(p);
+                if (startedGeneration !== generation.current) return;
                 setBaseSlotsByPrefix((prev) => ({ ...prev, [p]: base }));
             } catch {
                 // ignore
@@ -484,54 +516,39 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
     };
 
     const saveAll = async () => {
+        const startedGeneration = generation.current;
+        const savedRevision = editRevision.current;
         setSaving(true);
         setError(null);
         setAuthError(null);
         try {
-            // 1) Save dirty CMS keys
-            const dirtyKeys = Object.keys(dirtyContentKeys);
-            for (const k of dirtyKeys) {
-                const v = contentDraft[k];
-                if (!v) continue;
-                const supabase = getSupabaseClient();
-                await rpc<void>(supabase, 'admin_upsert_page_content', {
-                    p_page_key: k,
-                    p_body_en: v.en ?? '',
-                    p_body_es_draft: v.es ?? '',
-                });
-            }
-
-            // 2) Save dirty media prefixes
-            const dirtyPrefixes = Object.keys(dirtySlotPrefixes);
-            for (const prefix of dirtyPrefixes) {
-                const desired = (stagedSlotsByPrefix[prefix] || []).filter((x) => x.asset && x.asset.id);
-                const desiredKeys = new Set(desired.map((x) => x.slot_key));
-
-                const base = baseSlotsByPrefix[prefix] || [];
-                // Clear base items not present anymore.
-                for (const it of base) {
-                    if (!it.slot_key) continue;
-                    if (desiredKeys.has(it.slot_key)) continue;
-                    await adminSetMediaSlot(it.slot_key, null, it.sort ?? 0);
-                }
-
-                // Upsert desired items
-                for (let i = 0; i < desired.length; i++) {
-                    const it = desired[i];
-                    await adminSetMediaSlot(it.slot_key, it.asset!.id, i);
-                }
-            }
-
-            // 3) Reload section list + clear dirty flags
+            const strings = Object.entries(dirtyContentKeys).flatMap(([key, locales]) =>
+                (['en', 'es'] as const).filter((localeKey) => locales[localeKey]).map((localeKey) => ({
+                    key, locale: localeKey, body: contentDraft[key]?.[localeKey] ?? '',
+                }))
+            );
+            const media = Object.keys(dirtySlotPrefixes).map((prefix) => ({
+                prefix,
+                slots: (stagedSlotsByPrefix[prefix] || []).map((item, index) => ({
+                    slot_key: item.slot_key, asset_id: item.asset?.id ?? null, sort: index,
+                })),
+            }));
+            await rpc<void>(getSupabaseClient(), 'admin_save_content_bundle', { p_strings: strings, p_media: media });
+            if (startedGeneration !== generation.current) return;
             await loadSections();
-            setDirtyContentKeys({});
-            setDirtySlotPrefixes({});
+            if (startedGeneration !== generation.current) return;
+            if (savedRevision === editRevision.current) {
+                dirtyContentRef.current = {};
+                setDirtyContentKeys({});
+                setDirtySlotPrefixes({});
+            }
         } catch (e: any) {
+            if (startedGeneration !== generation.current) return;
             const msg = e?.message || admin.t('admin.common.saveFailed', 'Save failed');
             if (isAuthErrorMessage(msg)) setAuthError(msg);
             else setError(msg);
         } finally {
-            setSaving(false);
+            if (startedGeneration === generation.current) setSaving(false);
         }
     };
 
@@ -840,7 +857,7 @@ export default function PageContentWizard(props: { pageKey: string; autoOpen?: b
                 {admin.t('admin.pageComposer.content.open', 'Open Page Composer (Content)')}
             </Button>
 
-            <Dialog open={open} onClose={closeWizard} fullWidth maxWidth="lg">
+            <Dialog open={open} onClose={() => { if (!saving) closeWizard(); }} fullWidth maxWidth="lg">
                 <DialogTitle>{admin.t('admin.pageComposer.content.title', 'Page Composer (Content)')}</DialogTitle>
                 <DialogContent sx={{ pt: 2 }}>
                     {loading ? (

@@ -1,20 +1,12 @@
 import { NextResponse } from 'next/server';
 import { clearAdminAuthCookies } from '@/lib/adminAuth';
+import { sameOrigin } from '@/lib/adminOrigin';
 
-export function GET(req: Request) {
-    const ref = req.headers.get('referer') || '';
-    let locale = 'en';
-    try {
-        if (ref) {
-            const u = new URL(ref);
-            const seg = u.pathname.split('/').filter(Boolean)[0];
-            if (seg === 'en' || seg === 'es') locale = seg;
-        }
-    } catch {
-        // ignore
+export function POST(req: Request) {
+    if (!sameOrigin(req)) {
+        return NextResponse.json({ ok: false, message: 'Bad origin' }, { status: 403 });
     }
-
-    const res = NextResponse.redirect(new URL(`/${locale}/adminlogin`, req.url));
+    const res = NextResponse.json({ ok: true });
     clearAdminAuthCookies(res);
     return res;
 }

@@ -48,6 +48,37 @@ function isProbablyVideoPath(path: string): boolean {
     return p.endsWith('.mp4') || p.endsWith('.webm') || p.endsWith('.ogg') || p.endsWith('.mov');
 }
 
+function SectionCarousel({ items }: { items: MediaItem[] }) {
+    const [index, setIndex] = React.useState(0);
+    if (!items.length) return null;
+    const current = items[Math.max(0, Math.min(items.length - 1, index))];
+    const path = String(current?.path || '');
+    const isVideo = (current?.asset_type || '') === 'video' || (path ? isProbablyVideoPath(path) : false);
+    return (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between' }}>
+                <Button size="small" variant="outlined" onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIndex((value) => (value - 1 + items.length) % items.length);
+                }} disabled={items.length <= 1}>◀</Button>
+                <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                    {items.length > 1 ? `${index + 1}/${items.length}` : '1/1'}
+                </Typography>
+                <Button size="small" variant="outlined" onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIndex((value) => (value + 1) % items.length);
+                }} disabled={items.length <= 1}>▶</Button>
+            </Box>
+            {current?.url ? (isVideo
+                ? <Box component="video" controls src={current.url} sx={{ width: '100%', borderRadius: 2, background: 'hsl(var(--background))' }} />
+                : <Box component="img" src={current.url} alt={current?.title || ''} sx={{ width: '100%', height: 'auto', borderRadius: 2 }} />)
+                : null}
+        </Box>
+    );
+}
+
 function normalizeHref(raw: string): string {
     const v = String(raw || '').trim();
     return v || '#';
@@ -132,60 +163,6 @@ export default function PageSectionsRenderer(props: { pageKey: string; sections:
     );
 
     if (!ordered.length) return null;
-
-    const Carousel = ({ items, sectionId }: { items: MediaItem[]; sectionId: string }) => {
-        const [idx, setIdx] = React.useState(0);
-        React.useEffect(() => {
-            setIdx(0);
-        }, [sectionId, items.length]);
-
-        if (!items.length) return null;
-        const current = items[Math.max(0, Math.min(items.length - 1, idx))];
-        const path = String(current?.path || '');
-        const isVideo = (current?.asset_type || '') === 'video' || (path ? isProbablyVideoPath(path) : false);
-
-        return (
-            <Box sx={{ display: 'grid', gap: 1.5 }}>
-                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between' }}>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setIdx((n) => (items.length ? (n - 1 + items.length) % items.length : 0));
-                        }}
-                        disabled={items.length <= 1}
-                    >
-                        ◀
-                    </Button>
-                    <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                        {items.length > 1 ? `${idx + 1}/${items.length}` : '1/1'}
-                    </Typography>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setIdx((n) => (items.length ? (n + 1) % items.length : 0));
-                        }}
-                        disabled={items.length <= 1}
-                    >
-                        ▶
-                    </Button>
-                </Box>
-
-                {current?.url ? (
-                    isVideo ? (
-                        <Box component="video" controls src={current.url} sx={{ width: '100%', borderRadius: 2, background: 'hsl(var(--background))' }} />
-                    ) : (
-                        <Box component="img" src={current.url} alt={current?.title || ''} sx={{ width: '100%', height: 'auto', borderRadius: 2 }} />
-                    )
-                ) : null}
-            </Box>
-        );
-    };
 
     const out: React.ReactNode[] = [];
     let i = 0;
@@ -300,7 +277,7 @@ export default function PageSectionsRenderer(props: { pageKey: string; sections:
 
                         {carouselItems.length ? (
                             <Box sx={{ mt: primaryUrl ? 3 : 0 }}>
-                                <Carousel items={carouselItems} sectionId={sectionId} />
+                                <SectionCarousel key={`${sectionId}:${carouselItems.length}`} items={carouselItems} />
                             </Box>
                         ) : null}
                     </Container>

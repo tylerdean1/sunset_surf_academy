@@ -14,8 +14,8 @@ type CmsRow = Pick<
 
 type MediaRow = Database['public']['Functions']['get_public_media_assets_by_prefix']['Returns'][number];
 
-function isNonEmpty(value: unknown): value is string {
-    return typeof value === 'string' && value.trim().length > 0;
+function isString(value: unknown): value is string {
+    return typeof value === 'string';
 }
 
 function normalizeLocale(raw: string | null): Locale {
@@ -32,12 +32,12 @@ function normalizePrefix(raw: string | null): string {
 
 function resolveCmsValue(row: CmsRow, locale: Locale): string | null {
     if (locale === 'es') {
-        if (row.approved && isNonEmpty(row.body_es_published)) return row.body_es_published;
-        if (isNonEmpty(row.body_en)) return row.body_en;
+        if (row.approved && isString(row.body_es_published)) return row.body_es_published;
+        if (isString(row.body_en)) return row.body_en;
         return null;
     }
 
-    return isNonEmpty(row.body_en) ? row.body_en : null;
+    return isString(row.body_en) ? row.body_en : null;
 }
 
 function publicUrl(bucket: string, path: string): string {
@@ -87,7 +87,7 @@ export async function GET(req: Request) {
 
         for (const row of cmsRows) {
             const value = resolveCmsValue(row, locale);
-            if (!value) continue;
+            if (value === null) continue;
             strings[row.page_key] = value;
             if (row.updated_at) updatedAtByKey[row.page_key] = row.updated_at;
         }

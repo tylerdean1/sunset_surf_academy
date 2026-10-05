@@ -1,101 +1,12 @@
 #!/usr/bin/env node
 /* eslint-env node */
-
-const { spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-
-function resolveRepoRoot() {
-    const result = spawnSync('git', ['rev-parse', '--show-toplevel'], {
-        encoding: 'utf8',
-        shell: true,
-    });
-    if (result.status === 0) {
-        const root = String(result.stdout || '').trim();
-        if (root) return root;
-    }
-    return process.cwd();
+const path = require('node:path');
+const { ROOT, readSnapshot, atomicWrite } = require('./backend-schema.cjs');
+try {
+    const { sql } = readSnapshot();
+    atomicWrite(path.join(ROOT, 'lib', 'functions.sql'), sql);
+    console.log('Generated functions/schema SQL from the verified schema-only snapshot.');
+} catch (error) {
+    console.error(error instanceof Error ? error.message : 'Functions SQL generation failed.');
+    process.exitCode = 1;
 }
-
-function tryLoadDotenv(dotenvPath) {
-    try {
-        if (dotenvPath && fs.existsSync(dotenvPath)) {
-            require('dotenv').config({ path: dotenvPath });
-            return true;
-        }
-    } catch {
-        // ignore dotenv loading errors and continue fallbacks
-    }
-    return false;
-}
-
-function loadEnv(repoRoot) {
-    const explicit = String(process.env.ENV_PATH || '').trim();
-    if (explicit && tryLoadDotenv(path.resolve(repoRoot, explicit))) return;
-
-    const candidates = [
-        path.resolve(repoRoot, '.env.local'),
-        path.resolve(repoRoot, 'apps', 'web', '.env.local'),
-        path.resolve(repoRoot, '.env'),
-    ];
-
-    for (const candidate of candidates) {
-        if (tryLoadDotenv(candidate)) return;
-    }
-
-    try {
-        require('dotenv').config();
-    } catch {
-        // ignore fallback errors
-    }
-}
-
-function getDatabaseUrl(env) {
-    const dbUrl = String(env.DATABASE_URL || env.SUPABASE_DB_URL || '').trim();
-    if (!dbUrl) {
-        console.error('ERROR: DATABASE_URL or SUPABASE_DB_URL not set in environment.');
-        process.exit(1);
-    }
-    return dbUrl;
-}
-
-function main() {
-    const repoRoot = resolveRepoRoot();
-    loadEnv(repoRoot);
-
-    const dbUrl = getDatabaseUrl(process.env);
-    const outputPath = path.resolve(repoRoot, 'lib', 'functions.sql');
-
-    const args = [
-        '--schema=public',
-        '--section=pre-data',
-        '--section=post-data',
-        '--no-owner',
-        '--no-privileges',
-        '--no-tablespaces',
-        '--no-unlogged-table-data',
-        '--no-comments',
-        `--file=${outputPath}`,
-        dbUrl,
-    ];
-
-    console.log('Running: pg_dump [REDACTED_DB_URL] --schema=public --section=pre-data --section=post-data --no-owner --no-privileges --no-tablespaces --no-unlogged-table-data --no-comments');
-
-    const result = spawnSync('pg_dump', args, {
-        stdio: 'inherit',
-        shell: false,
-    });
-
-    if (result.error) {
-        console.warn('Skipped funcgen: pg_dump not available in PATH. Install PostgreSQL client tools to enable this step.');
-        return;
-    }
-
-    if (result.status !== 0) {
-        process.exit(result.status || 1);
-    }
-
-    console.log('Wrote functions SQL to', outputPath);
-}
-
-main();
