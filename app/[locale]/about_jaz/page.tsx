@@ -45,7 +45,7 @@ function AboutInner() {
 
     return (
         <Container maxWidth="md" sx={{ py: 8 }}>
-            <Typography variant="h2" gutterBottom color="#20B2AA">
+            <Typography variant="h2" gutterBottom color="primary.main">
                 {tDb('page.about_jaz.title', fallbackCopy)}
             </Typography>
             <Typography variant="h5" gutterBottom color="text.secondary">
@@ -64,7 +64,7 @@ function AboutInner() {
                             )}
                         </Typography>
 
-                        <Typography variant="h5" gutterBottom color="#20B2AA" sx={{ mt: 4 }}>
+                        <Typography variant="h5" gutterBottom color="primary.main" sx={{ mt: 4 }}>
                             {tDb('page.about_jaz.achievements', fallbackCopy)}
                         </Typography>
 

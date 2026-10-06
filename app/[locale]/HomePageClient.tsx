@@ -16,6 +16,7 @@ import PageSectionsRenderer from '@/components/sections/PageSectionsRenderer';
 import usePageSections from '@/hooks/usePageSections';
 import { usePublicHomeSectionsMetaSeed } from '@/components/content/PublicContentSeedContext';
 import { subscribeContentChanges } from '@/lib/contentCache';
+import { getHomeHeroDefaults } from '@/lib/publicNavigation';
 
 const TARGET_AUDIENCE_FALLBACK_IMAGES: string[] = [];
 const FALLBACK_COPY = 'Content unavailable';
@@ -117,6 +118,7 @@ function LegacyHome() {
 
 function HomeInner() {
   const locale = useLocale();
+  const heroDefaults = getHomeHeroDefaults(locale as 'en' | 'es');
   const ctx = useContentBundleContext();
   const strings = ctx?.strings || {};
   const media = ctx?.media || [];
@@ -152,19 +154,19 @@ function HomeInner() {
   return (
     <>
       <Hero
-        title={tDb('page.home.hero.title', FALLBACK_COPY)}
-        subtitle={tDb('page.home.hero.subtitle', FALLBACK_COPY)}
+        title={tDb('page.home.hero.title', heroDefaults.title)}
+        subtitle={tDb('page.home.hero.subtitle', heroDefaults.subtitle)}
         backgroundUrl={heroBg || undefined}
-        primaryAction={tDb('page.home.hero.primaryAction', FALLBACK_COPY)}
-        secondaryAction={tDb('page.home.hero.secondaryAction', FALLBACK_COPY)}
-        primaryHref={primaryHref}
-        secondaryHref={secondaryHref}
+        primaryAction={tDb('page.home.hero.primaryAction', heroDefaults.primaryAction)}
+        secondaryAction={tDb('page.home.hero.secondaryAction', heroDefaults.secondaryAction)}
+        primaryHref={primaryHref === '#' ? heroDefaults.primaryHref : primaryHref}
+        secondaryHref={secondaryHref === '#' ? heroDefaults.secondaryHref : secondaryHref}
         cmsKeyBase="page.home.hero"
       />
 
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Box textAlign="center" sx={{ mb: 6 }}>
-          <Typography variant="h3" gutterBottom color="#20B2AA">
+          <Typography variant="h3" gutterBottom color="primary.main">
             <EditableInlineText cmsKey="page.home.aboutPreview" fallback={FALLBACK_COPY}>
               {(v) => <>{v}</>}
             </EditableInlineText>
@@ -181,7 +183,7 @@ function HomeInner() {
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: '0 8px 24px rgba(32, 178, 170, 0.3)'
+                  boxShadow: '0 14px 32px rgba(7, 85, 80, 0.16)'
                 }
               }}>
                 <CardContent sx={{ p: 4 }}>
@@ -192,7 +194,7 @@ function HomeInner() {
                       mode="ordered"
                     />
                   </Box>
-                  <Typography variant="h5" gutterBottom color="#20B2AA">
+                  <Typography variant="h5" gutterBottom color="primary.main">
                     <EditableInlineText cmsKey="page.home.cards.lessons.title" fallback={FALLBACK_COPY}>
                       {(v) => <>{v}</>}
                     </EditableInlineText>
@@ -221,14 +223,14 @@ function HomeInner() {
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: '0 8px 24px rgba(32, 178, 170, 0.3)'
+                  boxShadow: '0 14px 32px rgba(7, 85, 80, 0.16)'
                 }
               }}>
                 <CardContent sx={{ p: 4 }}>
                   <Box sx={{ mb: 3 }}>
                     <GalleryCarousel images={galleryCardImages} mode="ordered" />
                   </Box>
-                  <Typography variant="h5" gutterBottom color="#20B2AA">
+                  <Typography variant="h5" gutterBottom color="primary.main">
                     <EditableInlineText cmsKey="page.home.cards.gallery.title" fallback={FALLBACK_COPY}>
                       {(v) => <>{v}</>}
                     </EditableInlineText>
@@ -257,7 +259,7 @@ function HomeInner() {
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: '0 8px 24px rgba(32, 178, 170, 0.3)'
+                  boxShadow: '0 14px 32px rgba(7, 85, 80, 0.16)'
                 }
               }}>
                 <CardContent sx={{ p: 4 }}>
@@ -280,7 +282,7 @@ function HomeInner() {
                   ) : (
                     <Box sx={{ height: 280, borderRadius: 2, mb: 3, background: 'hsl(var(--background))' }} />
                   )}
-                  <Typography variant="h5" gutterBottom color="#20B2AA">
+                  <Typography variant="h5" gutterBottom color="primary.main">
                     <EditableInlineText cmsKey="page.home.cards.team.title" fallback={FALLBACK_COPY}>
                       {(v) => <>{v}</>}
                     </EditableInlineText>

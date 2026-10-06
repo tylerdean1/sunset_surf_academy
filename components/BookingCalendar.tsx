@@ -460,8 +460,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({ onBookingComplete, in
               onClick={handleNext}
               disabled={submitting || !canProceed()}
               sx={{
-                backgroundColor: '#20B2AA',
-                '&:hover': { backgroundColor: '#1A9A9A' }
+                backgroundColor: 'primary.main',
+                '&:hover': { backgroundColor: 'primary.dark' }
               }}
             >
               {activeStep === steps.length - 1 ? (submitting ? 'Submitting…' : submitLabel) : nextLabel}

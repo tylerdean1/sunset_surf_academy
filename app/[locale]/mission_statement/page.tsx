@@ -39,7 +39,7 @@ function MissionInner() {
 
     return (
         <Container maxWidth="lg" sx={{ py: 8 }}>
-            <Typography variant="h2" gutterBottom color="#20B2AA">
+            <Typography variant="h2" gutterBottom color="primary.main">
                 {tDb('page.mission_statement.title', fallbackCopy)}
             </Typography>
             <Typography variant="h5" gutterBottom color="text.secondary">

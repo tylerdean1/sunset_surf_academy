@@ -7,6 +7,8 @@ import Hero from '@/components/Hero';
 import CmsRichTextRenderer from '@/components/CmsRichTextRenderer';
 import useContentBundle from '@/hooks/useContentBundle';
 import type { Database, Json } from '@/lib/database.types';
+import { getHomeHeroDefaults } from '@/lib/publicNavigation';
+import type { PublicLocale } from '@/lib/publicSite';
 import { CardGroupCard } from '@/components/sections/HomeSectionsRenderer';
 
 type PageSectionRow = Database['public']['Functions']['rpc_get_page_sections']['Returns'][number];
@@ -116,6 +118,7 @@ const FALLBACK_COPY = 'Content unavailable';
 
 export default function PageSectionsRenderer(props: { pageKey: string; sections: PageSectionRow[] }) {
     const locale = useLocale();
+    const homeHeroDefaults = props.pageKey === 'home' ? getHomeHeroDefaults(locale as PublicLocale) : null;
 
     // For page_sections pointers like section.<uuid>.*
     const sectionBundle = useContentBundle('section.');
@@ -190,13 +193,13 @@ export default function PageSectionsRenderer(props: { pageKey: string; sections:
             out.push(
                 <React.Fragment key={s.id}>
                     <Hero
-                        title={tSection(titleKey, FALLBACK_COPY)}
-                        subtitle={tSection(subtitleKey, FALLBACK_COPY)}
+                        title={tSection(titleKey, homeHeroDefaults?.title ?? FALLBACK_COPY)}
+                        subtitle={tSection(subtitleKey, homeHeroDefaults?.subtitle ?? FALLBACK_COPY)}
                         backgroundUrl={firstMediaUrl(sectionMedia, bgSlot) || undefined}
-                        primaryAction={tSection(primaryLabelKey, FALLBACK_COPY)}
-                        secondaryAction={tSection(secondaryLabelKey, FALLBACK_COPY)}
-                        primaryHref={normalizeHref(tSection(primaryHrefKey, primaryHrefFallback))}
-                        secondaryHref={normalizeHref(tSection(secondaryHrefKey, secondaryHrefFallback))}
+                        primaryAction={tSection(primaryLabelKey, homeHeroDefaults?.primaryAction ?? FALLBACK_COPY)}
+                        secondaryAction={tSection(secondaryLabelKey, homeHeroDefaults?.secondaryAction ?? FALLBACK_COPY)}
+                        primaryHref={normalizeHref(tSection(primaryHrefKey, homeHeroDefaults?.primaryHref ?? primaryHrefFallback))}
+                        secondaryHref={normalizeHref(tSection(secondaryHrefKey, homeHeroDefaults?.secondaryHref ?? secondaryHrefFallback))}
                         cmsKeyBase={`section.${sectionId}`}
                     />
                     <Divider />

@@ -47,7 +47,7 @@ export default function TeamCard({ name, images }: Props) {
                         py: 1.5,
                         borderRadius: 2,
                         textAlign: 'center',
-                        background: 'linear-gradient(90deg, #0a1f44 0%, #20B2AA 100%)',
+                        background: (theme) => `linear-gradient(105deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
                         boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
                         cursor: 'pointer'
                     }}

@@ -11,6 +11,7 @@ import ContentBundleProvider, { useContentBundleContext } from '@/components/con
 import { parseHomeSections, type CardGroupSourceKey, type HomeSectionMetaRow } from '@/lib/sections/parseHomeSections';
 import useCmsPageBody from '@/hooks/useCmsPageBody';
 import useContentBundle from '@/hooks/useContentBundle';
+import { getHomeHeroDefaults } from '@/lib/publicNavigation';
 
 const TARGET_AUDIENCE_FALLBACK_IMAGES: string[] = [];
 const FALLBACK_COPY = 'Content unavailable';
@@ -34,6 +35,7 @@ function HomeSectionsInner({
     sections: Array<ReturnType<typeof parseHomeSections>[number]>;
 }) {
     const locale = useLocale();
+    const heroDefaults = getHomeHeroDefaults(locale as 'en' | 'es');
     const ctx = useContentBundleContext();
     const strings = ctx?.strings || {};
     const media = ctx?.media || [];
@@ -71,13 +73,13 @@ function HomeSectionsInner({
             out.push(
                 <Hero
                     key={s.page_key}
-                    title={tDb('page.home.hero.title', FALLBACK_COPY)}
-                    subtitle={tDb('page.home.hero.subtitle', FALLBACK_COPY)}
+                    title={tDb('page.home.hero.title', heroDefaults.title)}
+                    subtitle={tDb('page.home.hero.subtitle', heroDefaults.subtitle)}
                     backgroundUrl={heroBg || undefined}
-                    primaryAction={tDb('page.home.hero.primaryAction', FALLBACK_COPY)}
-                    secondaryAction={tDb('page.home.hero.secondaryAction', FALLBACK_COPY)}
-                    primaryHref={tDb('page.home.hero.primaryHref', '#')}
-                    secondaryHref={tDb('page.home.hero.secondaryHref', '#')}
+                    primaryAction={tDb('page.home.hero.primaryAction', heroDefaults.primaryAction)}
+                    secondaryAction={tDb('page.home.hero.secondaryAction', heroDefaults.secondaryAction)}
+                    primaryHref={tDb('page.home.hero.primaryHref', heroDefaults.primaryHref)}
+                    secondaryHref={tDb('page.home.hero.secondaryHref', heroDefaults.secondaryHref)}
                     cmsKeyBase="page.home.hero"
                 />
             );
@@ -245,14 +247,14 @@ export function CardGroupCard(props: {
                     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                     '&:hover': {
                         transform: 'translateY(-4px)',
-                        boxShadow: '0 8px 24px rgba(32, 178, 170, 0.3)',
+                        boxShadow: '0 14px 32px rgba(7, 85, 80, 0.16)',
                     },
                 }}
             >
                 <CardContent sx={{ p: 4 }}>
                     <Box sx={{ mb: 3 }}>{mediaBlock}</Box>
 
-                    <Typography variant="h5" gutterBottom color="#20B2AA">
+                    <Typography variant="h5" gutterBottom color="primary.main">
                         {tDb(`page.${sourceKey}.title`, fallbackTitle)}
                     </Typography>
 

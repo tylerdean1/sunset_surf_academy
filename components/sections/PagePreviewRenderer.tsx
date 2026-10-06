@@ -5,6 +5,7 @@ import { Box, Button, Container, Divider, Typography } from '@mui/material';
 import Hero from '@/components/Hero';
 import CmsRichTextRenderer from '@/components/CmsRichTextRenderer';
 import type { Database, Json } from '@/lib/database.types';
+import PageSectionsRenderer from '@/components/sections/PageSectionsRenderer';
 
 type PageSectionRow = Database['public']['Functions']['rpc_get_page_sections']['Returns'][number];
 
@@ -39,10 +40,14 @@ export default function PagePreviewRenderer({ sections }: { sections: PageSectio
 }
 
 export function PagePreviewRendererInner(props: {
+    pageKey?: string;
     sections: PageSectionRow[];
     localeTab?: 'en' | 'es';
     content?: StagedContentMap;
     media?: StagedMediaMap;
+    selectedSectionId?: string;
+    onSelectSection?: (sectionId: string) => void;
+    showDiagnostics?: boolean;
 }) {
     const ordered = React.useMemo(() => [...props.sections].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)), [props.sections]);
     if (!ordered.length) return null;
@@ -70,6 +75,32 @@ export function PagePreviewRendererInner(props: {
     };
 
     const slotList = (slotKey: string) => media[slotKey] || [];
+
+    const selectableProps = (sectionId: string, kind: string) => {
+        if (!props.onSelectSection) return {};
+        const selected = props.selectedSectionId === sectionId;
+        return {
+            role: 'group' as const,
+            tabIndex: 0,
+            'aria-label': `Select ${kind} section`,
+            'data-page-composer-section': sectionId,
+            onClick: () => props.onSelectSection?.(sectionId),
+            onKeyDown: (event: React.KeyboardEvent) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    props.onSelectSection?.(sectionId);
+                }
+            },
+            sx: {
+                outline: selected ? '3px solid' : '2px solid transparent',
+                outlineColor: selected ? 'primary.main' : 'transparent',
+                outlineOffset: selected ? '-3px' : '-2px',
+                cursor: 'pointer',
+                transition: 'outline-color 120ms ease',
+                '&:hover, &:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '-2px' },
+            },
+        };
+    };
 
     const Carousel = ({ items, sectionId }: { items: Array<{ url: string; path?: string | null }>; sectionId: string }) => {
         const [idx, setIdx] = React.useState(0);
@@ -163,7 +194,7 @@ export function PagePreviewRendererInner(props: {
                 const carouselSlot =
                     pickString(media, 'carouselSlot') || (sectionId && kind === 'media' ? defaultSlotKey(sectionId, 'carousel') : '');
 
-                const header = (
+                const header = props.showDiagnostics === false || props.onSelectSection ? null : (
                     <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                             {idx + 1}. {String(s.kind)}
@@ -190,11 +221,11 @@ export function PagePreviewRendererInner(props: {
                         (sectionId ? defaultCmsKey(sectionId, 'cta.secondary.href') : '');
 
                     return (
-                        <Box key={s.id}>
+                        <Box key={s.id} {...selectableProps(sectionId, 'Hero')}>
                             {header}
                             <Hero
-                                title={titleKey ? t(titleKey, `(${titleKey})`) : 'Hero title'}
-                                subtitle={subtitleKey ? t(subtitleKey, `(${subtitleKey})`) : 'Hero subtitle'}
+                                title={titleKey ? t(titleKey, 'Add your headline') : 'Add your headline'}
+                                subtitle={subtitleKey ? t(subtitleKey, 'Add a short description') : 'Add a short description'}
                                 backgroundUrl={bgSlot ? slotFirstUrl(bgSlot) || undefined : undefined}
                                 primaryAction={primaryLabelKey ? t(primaryLabelKey, 'Primary') : 'Primary'}
                                 secondaryAction={secondaryLabelKey ? t(secondaryLabelKey, 'Secondary') : 'Secondary'}
@@ -202,14 +233,14 @@ export function PagePreviewRendererInner(props: {
                                 secondaryHref={secondaryHrefKey ? getHref(secondaryHrefKey, '#') : '#'}
                                 cmsKeyBase={props.content ? undefined : `section.${s.id}`}
                             />
-                            <Container maxWidth="lg" sx={{ py: 2 }}>
+                            {props.showDiagnostics === false || props.onSelectSection ? null : <Container maxWidth="lg" sx={{ py: 2 }}>
                                 <Typography variant="body2" color="text.secondary">
                                     content_source.titleKey={titleKey || '(missing)'} · content_source.subtitleKey={subtitleKey || '(missing)'}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     media_source.backgroundSlot={bgSlot || '(missing)'}
                                 </Typography>
-                            </Container>
+                            </Container>}
                             <Divider />
                         </Box>
                     );
@@ -218,15 +249,13 @@ export function PagePreviewRendererInner(props: {
                 if (kind === 'richText') {
                     const json = bodyKey ? t(bodyKey, '') : '';
                     return (
-                        <Box key={s.id}>
+                        <Box key={s.id} {...selectableProps(sectionId, 'Text')}>
                             {header}
                             <Container maxWidth="lg" sx={{ py: 4 }}>
-                                <Typography variant="h6" sx={{ mb: 1 }}>
-                                    Rich text
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    bodyKey={bodyKey || '(missing)'}
-                                </Typography>
+                                {props.showDiagnostics === false || props.onSelectSection ? null : <>
+                                    <Typography variant="h6" sx={{ mb: 1 }}>Rich text</Typography>
+                                    <Typography variant="body2" color="text.secondary">bodyKey={bodyKey || '(missing)'}</Typography>
+                                </>}
                                 {json ? (
                                     <Box sx={{ mt: 2 }}>
                                         <CmsRichTextRenderer json={json} />
@@ -234,7 +263,7 @@ export function PagePreviewRendererInner(props: {
                                 ) : (
                                     <Box sx={{ mt: 2, p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
                                         <Typography variant="body2" color="text.secondary">
-                                            Content preview appears after the Content Wizard saves CMS content.
+                                            Add text in the section editor to preview it here.
                                         </Typography>
                                     </Box>
                                 )}
@@ -248,15 +277,13 @@ export function PagePreviewRendererInner(props: {
                     const singleUrl = primarySlot ? slotFirstUrl(primarySlot) : '';
                     const carouselItems = carouselSlot ? slotList(carouselSlot) : [];
                     return (
-                        <Box key={s.id}>
+                        <Box key={s.id} {...selectableProps(sectionId, 'Photo or video')}>
                             {header}
                             <Container maxWidth="lg" sx={{ py: 4 }}>
-                                <Typography variant="h6" sx={{ mb: 1 }}>
-                                    Media
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    primarySlot={primarySlot || '(missing)'} · carouselSlot={carouselSlot || '(missing)'}
-                                </Typography>
+                                {props.showDiagnostics === false || props.onSelectSection ? null : <>
+                                    <Typography variant="h6" sx={{ mb: 1 }}>Media</Typography>
+                                    <Typography variant="body2" color="text.secondary">primarySlot={primarySlot || '(missing)'} · carouselSlot={carouselSlot || '(missing)'}</Typography>
+                                </>}
 
                                 {singleUrl ? (
                                     <Box sx={{ mt: 2 }}>
@@ -273,7 +300,7 @@ export function PagePreviewRendererInner(props: {
                                 {!singleUrl && !carouselItems.length ? (
                                     <Box sx={{ mt: 2, p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
                                         <Typography variant="body2" color="text.secondary">
-                                            Media preview appears after the Content Wizard saves slot selections.
+                                            Choose media in the section editor to preview it here.
                                         </Typography>
                                     </Box>
                                 ) : null}
@@ -285,15 +312,12 @@ export function PagePreviewRendererInner(props: {
 
                 if (kind === 'card_group') {
                     return (
-                        <Box key={s.id}>
+                        <Box key={s.id} {...selectableProps(sectionId, 'Card group')}>
                             {header}
                             <Container maxWidth="lg" sx={{ py: 4 }}>
-                                <Typography variant="h6" sx={{ mb: 1 }}>
-                                    Card group
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Uses existing card_group rendering; detailed preview will be wired in the Content Wizard.
-                                </Typography>
+                                {props.pageKey === 'home'
+                                    ? <PageSectionsRenderer pageKey="home" sections={[s]} />
+                                    : <Typography variant="body2" color="text.secondary">Card groups are only displayed on the Home page.</Typography>}
                             </Container>
                             <Divider />
                         </Box>
@@ -301,7 +325,7 @@ export function PagePreviewRendererInner(props: {
                 }
 
                 return (
-                    <Box key={s.id}>
+                    <Box key={s.id} {...selectableProps(sectionId, String(s.kind))}>
                         {header}
                         <Container maxWidth="lg" sx={{ py: 4 }}>
                             <Typography variant="body2" color="text.secondary">

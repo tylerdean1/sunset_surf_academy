@@ -50,7 +50,7 @@ function TeamInner() {
 
     return (
         <Container maxWidth="lg" sx={{ py: 8 }}>
-            <Typography variant="h2" gutterBottom color="#20B2AA">
+            <Typography variant="h2" gutterBottom color="primary.main">
                 {title}
             </Typography>
             <Typography variant="h5" gutterBottom color="text.secondary">
@@ -73,7 +73,7 @@ function TeamInner() {
                 <Grid item xs={12} md={6}>
                     <Card sx={{ maxWidth: 700, mx: 'auto' }}>
                         <CardContent>
-                            <Typography variant="h5" gutterBottom color="#20B2AA">
+                            <Typography variant="h5" gutterBottom color="primary.main">
                                 {moreTitle}
                             </Typography>
                             <Typography variant="body1" color="text.secondary" paragraph>

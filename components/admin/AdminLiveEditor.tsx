@@ -14,6 +14,7 @@ import { ADMIN_PAGES, type AdminPageKey } from './adminPages';
 
 import PageStructureWizard from '@/components/admin/wizard/PageStructureWizard';
 import PageContentWizard from '@/components/admin/wizard/PageContentWizard';
+import VisualPageComposer from '@/components/admin/VisualPageComposer';
 
 import HomePage from '@/app/[locale]/HomePageClient';
 import LessonsPage from '@/app/[locale]/lessons/page';
@@ -63,6 +64,8 @@ export default function AdminLiveEditor() {
         return <Alert severity="error">{msg}</Alert>;
     }
 
+    const usesSectionComposer = page === 'home' || page === 'gallery' || page === 'mission_statement' || page === 'about_jaz' || page === 'team' || page === 'faq' || page === 'contact';
+
     const blockNavigationCapture = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement | null;
         if (!target) return;
@@ -76,39 +79,46 @@ export default function AdminLiveEditor() {
     };
 
     return (
-        <AdminEditProvider enabled>
+        <AdminEditProvider enabled={!usesSectionComposer}>
             <Box sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                    <Typography variant="body2" color="text.secondary">
-                        {admin.t('admin.liveEditor.pageLabel', 'Page')}: <Box component="span" sx={{ fontFamily: 'monospace' }}>{page}</Box>
-                    </Typography>
-                    <Button size="small" variant={mode === 'structure' ? 'contained' : 'outlined'} href={`/${locale}/admin/live-editor?page=${page}&mode=structure`}>
-                        Structure
-                    </Button>
-                    <Button size="small" variant={mode === 'content' ? 'contained' : 'outlined'} href={`/${locale}/admin/live-editor?page=${page}&mode=content`}>
-                        Content
-                    </Button>
-                </Box>
-
-                <Box sx={{ mt: 2 }}>
-                    {mode === 'structure' ? <PageStructureWizard key={`structure:${page}`} pageKey={page} autoOpen /> : null}
-                    {mode === 'content' ? <PageContentWizard key={`content:${page}`} pageKey={page} autoOpen /> : null}
-                </Box>
+                {usesSectionComposer ? (
+                    <VisualPageComposer key={`visual:${page}`} pageKey={page} />
+                ) : (
+                    <>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                            <Typography variant="body2" color="text.secondary">
+                                {admin.t('admin.liveEditor.pageLabel', 'Page')}: <Box component="span" sx={{ fontFamily: 'monospace' }}>{page}</Box>
+                            </Typography>
+                            <Button size="small" variant={mode === 'structure' ? 'contained' : 'outlined'} href={`/${locale}/admin/live-editor?page=${page}&mode=structure`}>
+                                Structure
+                            </Button>
+                            <Button size="small" variant={mode === 'content' ? 'contained' : 'outlined'} href={`/${locale}/admin/live-editor?page=${page}&mode=content`}>
+                                Content
+                            </Button>
+                        </Box>
+                        <Box sx={{ mt: 2 }}>
+                            {mode === 'structure' ? <PageStructureWizard key={`structure:${page}`} pageKey={page} autoOpen /> : null}
+                            {mode === 'content' ? <PageContentWizard key={`content:${page}`} pageKey={page} autoOpen /> : null}
+                        </Box>
+                    </>
+                )}
 
                 {page === 'gallery' ? <GalleryMediaSlotsEditor /> : null}
 
-                <Box
-                    onClickCapture={blockNavigationCapture}
-                    sx={{
-                        mt: 3,
-                        '& a[href]': {
-                            pointerEvents: 'none',
-                            cursor: 'default',
-                        },
-                    }}
-                >
-                    <LivePagePreview key={page} page={page} />
-                </Box>
+                {!usesSectionComposer ? (
+                    <Box
+                        onClickCapture={blockNavigationCapture}
+                        sx={{
+                            mt: 3,
+                            '& a[href]': {
+                                pointerEvents: 'none',
+                                cursor: 'default',
+                            },
+                        }}
+                    >
+                        <LivePagePreview key={page} page={page} />
+                    </Box>
+                ) : null}
             </Box>
         </AdminEditProvider>
     );

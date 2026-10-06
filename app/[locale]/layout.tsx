@@ -9,6 +9,7 @@ import PublicContentSeedProvider from '@/components/content/PublicContentSeedCon
 import { getPublicContentBundle } from '@/lib/server/publicContent';
 import { type PublicLocale, siteOrigin } from '@/lib/publicSite';
 import type { ContentBundleResponse } from '@/types/contentBundle';
+import PublicFooter from '@/components/PublicFooter';
 
 const locales = ['en', 'es'];
 
@@ -53,6 +54,7 @@ export default async function LocaleLayout({
         <AppLoadingFrame locale={locale}>
           <Navigation />
           <main className="pt-16">{children}</main>
+          <PublicFooter />
         </AppLoadingFrame>
       </PublicContentSeedProvider>
     </NextIntlClientProvider>

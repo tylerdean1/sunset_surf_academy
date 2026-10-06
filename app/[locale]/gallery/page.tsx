@@ -53,7 +53,7 @@ function GalleryInner() {
   return (
     <Container maxWidth="lg" sx={{ py: 8 }}>
       <Box textAlign="center" sx={{ mb: 6 }}>
-        <Typography variant="h2" gutterBottom color="#20B2AA">
+        <Typography variant="h2" gutterBottom color="primary.main">
           {tDb('page.gallery.title', fallbackCopy)}
         </Typography>
         <Typography variant="h5" color="text.secondary">

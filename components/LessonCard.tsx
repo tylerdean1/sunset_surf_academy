@@ -87,12 +87,12 @@ const LessonCard: React.FC<LessonCardProps> = ({
         flexDirection: 'column',
         position: 'relative',
         transform: featured ? 'scale(1.05)' : 'scale(1)',
-        boxShadow: featured ? '0 8px 32px rgba(32, 178, 170, 0.3)' : '0 4px 16px rgba(0,0,0,0.1)',
-        border: featured ? '2px solid #20B2AA' : 'none',
+        boxShadow: featured ? '0 12px 30px rgba(7, 85, 80, 0.16)' : '0 8px 24px rgba(15, 54, 53, 0.07)',
+        border: featured ? (theme) => `2px solid ${theme.palette.primary.main}` : 'none',
         transition: 'all 0.3s ease-in-out',
         '&:hover': {
           transform: featured ? 'scale(1.05)' : 'scale(1.02)',
-          boxShadow: '0 8px 32px rgba(32, 178, 170, 0.2)'
+          boxShadow: '0 14px 34px rgba(7, 85, 80, 0.18)'
         }
       }}
     >
@@ -108,7 +108,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <Typography variant="h4" color="#20B2AA" fontWeight={700}>
+          <Typography variant="h4" color="primary.main" fontWeight={700}>
             {cmsKeyBase && cmsFields?.price !== false ? (
               <EditableInlineText cmsKey={`${cmsKeyBase}.price`} fallback={price}>
                 {(v) => <>{v}</>}
@@ -139,7 +139,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
           )}
         </Typography>
 
-        <Typography variant="h6" gutterBottom color="#20B2AA">
+        <Typography variant="h6" gutterBottom color="primary.main">
           {includesLabel}
         </Typography>
         <List dense>
@@ -171,9 +171,10 @@ const LessonCard: React.FC<LessonCardProps> = ({
             fullWidth
             size="large"
             sx={{
-              backgroundColor: featured ? '#FF6B6B' : '#20B2AA',
+              backgroundColor: featured ? 'secondary.main' : 'primary.main',
+              color: featured ? 'secondary.contrastText' : 'primary.contrastText',
               '&:hover': {
-                backgroundColor: featured ? '#FF5252' : '#1A9A9A'
+                backgroundColor: featured ? 'secondary.dark' : 'primary.dark'
               },
               py: 1.5,
               fontWeight: 600

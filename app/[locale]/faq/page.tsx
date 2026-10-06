@@ -41,7 +41,7 @@ function FAQInner() {
   return (
     <Container maxWidth="md" sx={{ py: 8 }}>
       <Box textAlign="center" sx={{ mb: 6 }}>
-        <Typography variant="h2" gutterBottom color="#20B2AA">
+        <Typography variant="h2" gutterBottom color="primary.main">
           {title}
         </Typography>
       </Box>
@@ -59,7 +59,7 @@ function FAQInner() {
               expandIcon={<ExpandMore />}
               sx={{ backgroundColor: '#f8f9fa' }}
             >
-        <Typography variant="h6" color="#20B2AA">
+        <Typography variant="h6" color="primary.main">
                 {tDb(`page.faq.items.${index}.question`, fallbackCopy)}
               </Typography>
             </AccordionSummary>

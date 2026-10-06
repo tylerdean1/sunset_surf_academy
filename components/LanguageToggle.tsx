@@ -9,7 +9,7 @@ import useContentBundle from '@/hooks/useContentBundle';
 
 const FALLBACK_COPY = 'Content unavailable';
 
-const LanguageToggle: React.FC = () => {
+const LanguageToggle: React.FC<{ tone?: 'light' | 'inverse' }> = ({ tone = 'light' }) => {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
@@ -31,11 +31,11 @@ const LanguageToggle: React.FC = () => {
       variant="outlined"
       size="small"
       sx={{
-        color: 'white',
-        borderColor: 'white',
+        color: tone === 'inverse' ? '#fff' : 'primary.dark',
+        borderColor: tone === 'inverse' ? 'rgba(255,255,255,0.72)' : 'rgba(7,85,80,0.32)',
         '&:hover': {
-          borderColor: '#20B2AA',
-          backgroundColor: 'rgba(32, 178, 170, 0.1)'
+          borderColor: tone === 'inverse' ? '#fff' : 'primary.main',
+          backgroundColor: tone === 'inverse' ? 'rgba(255,255,255,0.12)' : 'rgba(13,114,108,0.08)'
         }
       }}
     >
